@@ -111,7 +111,7 @@ impl BuildRust{
                 Configuration::Release => "release".into(),
             },
             "--target-dir".into(),
-            get_building_dir(&opts).to_string_lossy().to_string()
+            get_build_dir(&opts).to_string_lossy().to_string()
         ];
 
         if let Some(target) = opts.platform.rust_target_triple() {
