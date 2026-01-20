@@ -1,0 +1,12 @@
+[package]
+name = "staccato-core"
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]

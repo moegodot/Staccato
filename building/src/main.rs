@@ -1,72 +1,73 @@
-mod platform;
 mod configuration;
+mod platform;
 
-use std::{env, fs};
+use crate::configuration::Configuration;
+use crate::platform::{Architecture, Os, Platform, is_os};
+use ::color_eyre::eyre;
+use ::owo_colors::OwoColorize;
+use ::std::ops::Index;
+use clap::{Args, Parser, Subcommand};
+use color_eyre::eyre::{Context, ContextCompat, eyre};
+use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;
-use clap::{Args, Parser, Subcommand};
-use ::color_eyre::eyre;
-use ::owo_colors::OwoColorize;
-use color_eyre::eyre::{eyre, Context, ContextCompat};
-use ignore::WalkBuilder;
-use crate::configuration::Configuration;
-use crate::platform::{is_os, Architecture, Os, Platform};
+use std::{env, fs};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct BuildingOpts{
+struct BuildingOpts {
     root: PathBuf,
     platform: Platform,
     configuration: Configuration,
 }
 
-impl AsRef<Path> for BuildingOpts{
+impl AsRef<Path> for BuildingOpts {
     fn as_ref(&self) -> &Path {
         &self.root
     }
 }
 
-impl AsRef<Platform> for BuildingOpts{
+impl AsRef<Platform> for BuildingOpts {
     fn as_ref(&self) -> &Platform {
         &self.platform
     }
 }
 
-impl AsRef<Configuration> for BuildingOpts{
+impl AsRef<Configuration> for BuildingOpts {
     fn as_ref(&self) -> &Configuration {
         &self.configuration
     }
 }
 
-#[derive(Parser,Debug)]
+#[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    #[arg(short, long,global=true)]
+    #[arg(short, long, global = true)]
     pub root: Option<String>,
 
     #[arg(short, long, default_value_t = true)]
     pub clean: bool,
 
     #[arg(short, long, default_value_t = true)]
-    pub upgrade:bool,
+    pub upgrade: bool,
 
     #[arg(value_enum,short, long, default_value_t = crate::configuration::Configuration::Debug, global=true)]
-    pub configuration:Configuration,
+    pub configuration: Configuration,
 
     #[command(flatten)]
-    pub target:TargetPlatformArgs,
+    pub target: TargetPlatformArgs,
 
     #[command(subcommand)]
     pub commands: Commands,
 }
 
 #[derive(Args, Debug)]
-struct TargetPlatformArgs{
+struct TargetPlatformArgs {
     target_os: Option<Os>,
     target_architecture: Option<Architecture>,
 }
 
-#[derive(Subcommand,Debug)]
+#[derive(Subcommand, Debug)]
 pub enum Commands {
     #[command()]
     BuildGlue(BuildGlue),
@@ -75,7 +76,7 @@ pub enum Commands {
     #[command()]
     BuildManaged(BuildManaged),
     #[command(visible_alias = "build")]
-    BuildAll{
+    BuildAll {
         #[command(flatten)]
         glue: BuildGlue,
         #[command(flatten)]
@@ -85,33 +86,33 @@ pub enum Commands {
     },
 }
 
-#[derive(Args,Debug,Clone)]
-pub struct BuildGlue{}
-impl BuildGlue{
-    pub fn invoke(self,opts:&BuildingOpts) -> eyre::Result<()> {
+#[derive(Args, Debug, Clone)]
+pub struct BuildGlue {}
+impl BuildGlue {
+    pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
         Ok(())
     }
 }
 
-#[derive(Args,Debug,Clone)]
-pub struct BuildRust{}
-impl BuildRust{
-    pub fn invoke(self,opts:&BuildingOpts) -> eyre::Result<()> {
+#[derive(Args, Debug, Clone)]
+pub struct BuildRust {}
+impl BuildRust {
+    pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
         let source = get_rust_source_dir(opts.root.as_path());
 
-        let cargo = which("cargo".into(), |a,b| a.cmp(b))
-            .wrap_err("failed to find cargo in PATH")?;
+        let cargo =
+            which("cargo".into(), |a, b| a.cmp(b)).wrap_err("failed to find cargo in PATH")?;
 
         let mut args = vec![
             "build".into(),
             "--workspace".into(),
             "--profile".into(),
-            match opts.configuration{
+            match opts.configuration {
                 Configuration::Debug => "dev".into(),
                 Configuration::Release => "release".into(),
             },
             "--target-dir".into(),
-            get_build_dir(&opts).to_string_lossy().to_string()
+            get_build_dir(&opts).to_string_lossy().to_string(),
         ];
 
         if let Some(target) = opts.platform.rust_target_triple() {
@@ -119,56 +120,99 @@ impl BuildRust{
             args.push(target.into());
         }
 
-        run(&cargo, &source, args.into_iter(), true,|_|{})?;
+        run(&cargo, &source, args.into_iter(), true, |_| {})?;
 
         Ok(())
     }
 }
 
-#[derive(Args,Debug,Clone)]
-pub struct BuildManaged{
-    #[arg(short, long, default_value = "net10.0")]
-    framework:String,
+#[derive(Args, Debug, Clone)]
+pub struct UpdateVersion {}
+impl UpdateVersion {
+    pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
+        let version_file = opts.root.join(VERSION_FILE_NAME);
+
+        let version = fs::read_to_string(version_file)?.trim();
+
+        // write to source/native/rust/Cargo.toml
+        {
+            let start_mark = "# Version is mantained by sb,do not edit manually - start";
+            let end_mark = "# Version is mantained by sb,do not edit manually - end";
+
+            let cargo_toml_file = get_rust_source_dir(opts.root.as_path()).join("Cargo.toml");
+
+            let cargo_toml = fs::read_to_string(&cargo_toml_file)?;
+
+            let start_index = cargo_toml.find(start_mark).unwrap();
+            let end_index = cargo_toml.find(end_mark).unwrap();
+
+            let new_cargo_toml = cargo_toml[..(start_index + start_mark.len())].to_string();
+            let new_cargo_toml = format!("{}\nversion = \"{}\"\n", new_cargo_toml, version);
+            let new_cargo_toml = format!("{}{}", new_cargo_toml, &cargo_toml[end_index..]);
+
+            fs::write(&cargo_toml_file, new_cargo_toml)?;
+        }
+
+        Ok(())
+    }
 }
-impl BuildManaged{
-    pub fn invoke(self,opts:&BuildingOpts) -> eyre::Result<()> {
+
+#[derive(Args, Debug, Clone)]
+pub struct BuildManaged {
+    #[arg(short, long, default_value = "net10.0")]
+    framework: String,
+}
+impl BuildManaged {
+    pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
         let source = get_managed_source_dir(opts.root.as_path());
 
-        let dotnet = which("dotnet".into(), |a,b| a.cmp(b))
-            .wrap_err("failed to find dotnet in PATH")?;
+        let dotnet =
+            which("dotnet".into(), |a, b| a.cmp(b)).wrap_err("failed to find dotnet in PATH")?;
 
-        run(&dotnet, &source, vec![
-            "build".into(),
-            source.to_string_lossy().to_string(),
-            /*
-            enable when AOT,but we needn't now
-            "--runtime".into(),
-            format!("{}-{}",
-            match opts.platform.os.unwrap_or_default(){
-                Os::Windows => "win",
-                Os::Linux => "linux",
-                Os::MacOS => "osx",
-            },
-            match opts.platform.architecture.unwrap_or_default(){
-                Architecture::X64 => "x64",
-                Architecture::Arm64 => "arm64",
-            }),
-            */
-            "--framework".into(),
-            self.framework,
-            "--configuration".into(),
-            opts.configuration.as_ref().into()].into_iter(),true,|_|{})?;
+        run(
+            &dotnet,
+            &source,
+            vec![
+                "build".into(),
+                source.to_string_lossy().to_string(),
+                /*
+                enable when AOT,but we needn't now
+                "--runtime".into(),
+                format!("{}-{}",
+                match opts.platform.os.unwrap_or_default(){
+                    Os::Windows => "win",
+                    Os::Linux => "linux",
+                    Os::MacOS => "osx",
+                },
+                match opts.platform.architecture.unwrap_or_default(){
+                    Architecture::X64 => "x64",
+                    Architecture::Arm64 => "arm64",
+                }),
+                */
+                "--framework".into(),
+                self.framework,
+                "--configuration".into(),
+                opts.configuration.as_ref().into(),
+            ]
+            .into_iter(),
+            true,
+            |_| {},
+        )?;
 
         Ok(())
     }
 }
 
-fn copy_sb_to_old(exe_path:&Path) -> eyre::Result<()> {
+fn copy_sb_to_old(exe_path: &Path) -> eyre::Result<()> {
     if cfg!(target_os = "windows") && exe_path.exists() {
         let mut old_path = exe_path.to_path_buf();
         old_path.set_extension("exe.old");
         let _ = fs::remove_file(&old_path);
-        println!("move {} to {}", exe_path.display().bright_white(), old_path.display().bright_white());
+        println!(
+            "move {} to {}",
+            exe_path.display().bright_white(),
+            old_path.display().bright_white()
+        );
         fs::rename(exe_path, old_path)?;
     }
 
@@ -181,22 +225,19 @@ fn copy_sb_to_old(exe_path:&Path) -> eyre::Result<()> {
 /// * `source_dir` - 源码根目录（例如 ./building）
 /// * `binary_path` - 编译出的二进制路径（例如 ./target/release/sb）
 fn is_source_updated(source_dir: &Path, binary_path: &Path) -> bool {
-
     // 1. 如果二进制文件不存在，必然需要更新
     let binary_metadata = match fs::metadata(binary_path) {
         Ok(m) => m,
         Err(_) => return true,
     };
 
-    let binary_mtime = binary_metadata
-        .modified()
-        .unwrap_or(SystemTime::UNIX_EPOCH);
+    let binary_mtime = binary_metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
 
     // 2. 使用 ignore crate 遍历源码目录
     // 它会自动处理 .gitignore 和隐藏文件
     let walker = WalkBuilder::new(source_dir)
         .standard_filters(true) // 启用 .gitignore, .ignore 等过滤
-        .hidden(true)           // 忽略隐藏文件
+        .hidden(true) // 忽略隐藏文件
         .build();
 
     for result in walker {
@@ -224,29 +265,32 @@ fn is_source_updated(source_dir: &Path, binary_path: &Path) -> bool {
     false
 }
 
-pub fn which<F>(exe:String, sort_func:F) -> Option<std::path::PathBuf>
-where F: FnMut(&std::path::PathBuf,&std::path::PathBuf) -> std::cmp::Ordering {
+pub fn which<F>(exe: String, sort_func: F) -> Option<std::path::PathBuf>
+where
+    F: FnMut(&std::path::PathBuf, &std::path::PathBuf) -> std::cmp::Ordering,
+{
     let path = std::env::var_os("PATH")?;
-    let path_ext = if is_os(Os::Windows){
+    let path_ext = if is_os(Os::Windows) {
         let path_ext = std::env::var("PATHEXT").ok()?;
 
-        let path_ext:Vec<String> = path_ext.split(";").map(|s| s.into()).collect();
+        let path_ext: Vec<String> = path_ext.split(";").map(|s| s.into()).collect();
 
-        vec!["".into()].into_iter()
+        vec!["".into()]
+            .into_iter()
             .chain(path_ext.clone().into_iter().map(|s| s.to_ascii_uppercase()))
-            .chain(path_ext.into_iter().map(|s| s.to_ascii_uppercase())).collect()
-    }
-    else{
+            .chain(path_ext.into_iter().map(|s| s.to_ascii_uppercase()))
+            .collect()
+    } else {
         vec!["".into()]
     };
 
     let mut found = vec![];
 
-    for path in std::env::split_paths(&path){
-        for ext in &path_ext{
-            let candidate = path.join(format!("{}{}",exe,ext));
+    for path in std::env::split_paths(&path) {
+        for ext in &path_ext {
+            let candidate = path.join(format!("{}{}", exe, ext));
 
-            if candidate.is_file(){
+            if candidate.is_file() {
                 found.push(candidate);
             }
         }
@@ -259,34 +303,61 @@ where F: FnMut(&std::path::PathBuf,&std::path::PathBuf) -> std::cmp::Ordering {
     found.into_iter().next()
 }
 
-pub fn run<F>(exe:&Path, work_dir:&Path, args:impl Iterator<Item = String>, check:bool, f: F) -> eyre::Result<()>
-    where F:FnOnce(&mut std::process::Command){
-
+pub fn run<F>(
+    exe: &Path,
+    work_dir: &Path,
+    args: impl Iterator<Item = String>,
+    check: bool,
+    f: F,
+) -> eyre::Result<()>
+where
+    F: FnOnce(&mut std::process::Command),
+{
     let mut cmd = std::process::Command::new(&exe);
 
     cmd.current_dir(work_dir);
 
-    let collected:Vec<String> = args.collect();
+    let collected: Vec<String> = args.collect();
 
     cmd.args(collected.iter());
 
     f(&mut cmd);
 
-    println!("{}",
-    format!("spawn in {:?}: {:?} {}", work_dir.bright_white(), exe.bright_cyan(), collected.join(" ").bright_blue()).underline());
+    println!(
+        "{}",
+        format!(
+            "spawn in {:?}: {:?} {}",
+            work_dir.bright_white(),
+            exe.bright_cyan(),
+            collected.join(" ").bright_blue()
+        )
+        .underline()
+    );
 
     let mut process = cmd.spawn()?;
 
     let exit = process.wait()?;
 
-    let code = exit.code().ok_or(eyre!("failed to get exit code of the process"))?;
+    let code = exit
+        .code()
+        .ok_or(eyre!("failed to get exit code of the process"))?;
 
     let success = code == 0;
 
-    println!("process exit, code {}", if success { code.green().to_string() } else { code.red().to_string() });
+    println!(
+        "process exit, code {}",
+        if success {
+            code.green().to_string()
+        } else {
+            code.red().to_string()
+        }
+    );
 
-    if (!success) && check{
-        return Err(eyre::eyre!("the process failed with code {}, and argument `check` is true",code));
+    if (!success) && check {
+        return Err(eyre::eyre!(
+            "the process failed with code {}, and argument `check` is true",
+            code
+        ));
     }
 
     Ok(())
@@ -294,123 +365,149 @@ pub fn run<F>(exe:&Path, work_dir:&Path, args:impl Iterator<Item = String>, chec
 
 static VERSION_FILE_NAME: &str = "staccato.version";
 
-pub fn get_root_dir() -> eyre::Result<PathBuf>{
+pub fn get_root_dir() -> eyre::Result<PathBuf> {
     let mut current_dir = env::current_dir().wrap_err("failed to get current dir")?;
 
     let version_file = current_dir.join(VERSION_FILE_NAME);
 
-    if version_file.is_file(){
+    if version_file.is_file() {
         return Ok(current_dir);
     }
 
-    while let Some(parent) = current_dir.parent(){
+    while let Some(parent) = current_dir.parent() {
         let version_file = parent.join(VERSION_FILE_NAME);
 
-        if version_file.is_file(){
+        if version_file.is_file() {
             return Ok(parent.to_path_buf());
         }
 
         current_dir = parent.to_path_buf();
     }
 
-    Err(eyre::eyre!("failed to find root dir, no `{}` file found in current or any parent dirs",VERSION_FILE_NAME))
+    Err(eyre::eyre!(
+        "failed to find root dir, no `{}` file found in current or any parent dirs",
+        VERSION_FILE_NAME
+    ))
 }
 
-pub fn get_source_dir(root: impl AsRef<Path>) -> PathBuf{
-    let r= root.as_ref().join("source");
+pub fn get_source_dir(root: impl AsRef<Path>) -> PathBuf {
+    let r = root.as_ref().join("source");
     fs::create_dir_all(&r).unwrap();
     r
 }
 
-pub fn get_building_dir(root: impl AsRef<Path>) -> PathBuf{
-    let r= root.as_ref().join("building");
+pub fn get_building_dir(root: impl AsRef<Path>) -> PathBuf {
+    let r = root.as_ref().join("building");
     fs::create_dir_all(&r).unwrap();
     r
 }
 
-pub fn get_native_source_dir(root: impl AsRef<Path>) -> PathBuf{
-    let r= get_source_dir(root).join("native");
+pub fn get_native_source_dir(root: impl AsRef<Path>) -> PathBuf {
+    let r = get_source_dir(root).join("native");
     fs::create_dir_all(&r).unwrap();
     r
 }
 
-pub fn get_rust_source_dir(root: impl AsRef<Path>) -> PathBuf{
-    let r= get_native_source_dir(root).join("rust");
+pub fn get_rust_source_dir(root: impl AsRef<Path>) -> PathBuf {
+    let r = get_native_source_dir(root).join("rust");
     fs::create_dir_all(&r).unwrap();
     r
 }
 
-pub fn get_cpp_source_dir(root: impl AsRef<Path>) -> PathBuf{
-    let r= get_native_source_dir(root).join("glue");
+pub fn get_cpp_source_dir(root: impl AsRef<Path>) -> PathBuf {
+    let r = get_native_source_dir(root).join("glue");
     fs::create_dir_all(&r).unwrap();
     r
 }
 
-pub fn get_managed_source_dir(root: impl AsRef<Path>) -> PathBuf{
-    let r= get_source_dir(root).join("managed");
+pub fn get_managed_source_dir(root: impl AsRef<Path>) -> PathBuf {
+    let r = get_source_dir(root).join("managed");
     fs::create_dir_all(&r).unwrap();
     r
 }
 
-pub fn get_opts_dir(opts:&BuildingOpts, name:&str) -> PathBuf{
+pub fn get_opts_dir(opts: &BuildingOpts, name: &str) -> PathBuf {
     let architecture = opts.platform.architecture.unwrap_or_default();
     let architecture = architecture.as_ref();
     let os = opts.platform.os.unwrap_or_default();
     let os = os.as_ref();
     let configuration = opts.configuration.as_ref();
 
-    let result = opts.root.join(name).join(architecture).join(os).join(configuration);
+    let result = opts
+        .root
+        .join(name)
+        .join(architecture)
+        .join(os)
+        .join(configuration);
 
     fs::create_dir_all(&result).unwrap();
 
     result
 }
 
-pub fn get_build_dir(opts:&BuildingOpts) -> PathBuf{
-    get_opts_dir(opts,"build")
+pub fn get_build_dir(opts: &BuildingOpts) -> PathBuf {
+    get_opts_dir(opts, "build")
 }
 
-pub fn get_install_dir(opts:&BuildingOpts) -> PathBuf{
-    get_opts_dir(opts,"install")
+pub fn get_install_dir(opts: &BuildingOpts) -> PathBuf {
+    get_opts_dir(opts, "install")
 }
 
-pub fn get_artifact_dir(opts:&BuildingOpts) -> PathBuf{
-    get_opts_dir(opts,"artifact")
+pub fn get_artifact_dir(opts: &BuildingOpts) -> PathBuf {
+    get_opts_dir(opts, "artifact")
 }
 
-pub fn install_sb(source:&Path) -> eyre::Result<()>{
-    let cargo = which("cargo".into(), |a,b| a.cmp(b))
-        .wrap_err("failed to find cargo in PATH")?;
+pub fn install_sb(source: &Path) -> eyre::Result<()> {
+    let cargo = which("cargo".into(), |a, b| a.cmp(b)).wrap_err("failed to find cargo in PATH")?;
 
-    run(&cargo, source, vec!["install".into(),"--path".into(),source.to_string_lossy().to_string()].into_iter(), true,|_|{})?;
+    run(
+        &cargo,
+        source,
+        vec![
+            "install".into(),
+            "--path".into(),
+            source.to_string_lossy().to_string(),
+        ]
+        .into_iter(),
+        true,
+        |_| {},
+    )?;
 
     Ok(())
 }
 
-pub fn run_sb() -> eyre::Result<()>{
-    let sb_path = which("sb".into(), |a,b| {
-        if let (Some(a_meta),Some(b_meta)) = (a.metadata().ok(),b.metadata().ok()){
-            if let (Ok(a_time),Ok(b_time)) = (a_meta.modified(),b_meta.modified()){
+pub fn run_sb() -> eyre::Result<()> {
+    let sb_path = which("sb".into(), |a, b| {
+        if let (Some(a_meta), Some(b_meta)) = (a.metadata().ok(), b.metadata().ok()) {
+            if let (Ok(a_time), Ok(b_time)) = (a_meta.modified(), b_meta.modified()) {
                 return a_time.cmp(&b_time);
             }
         }
         a.cmp(b)
     })
-        .wrap_err("failed to find sb in PATH")?;
+    .wrap_err("failed to find sb in PATH")?;
 
-    let current_dir = env::current_dir()
-        .wrap_err("failed to get current dir")?;
+    let current_dir = env::current_dir().wrap_err("failed to get current dir")?;
 
-    run(&sb_path, &current_dir, env::args().into_iter().skip(1), true, |_|{})?;
+    run(
+        &sb_path,
+        &current_dir,
+        env::args().into_iter().skip(1),
+        true,
+        |_| {},
+    )?;
 
     Ok(())
 }
 
-pub fn upgrade(root:&Path,binary:PathBuf) -> eyre::Result<()> {
+pub fn upgrade(root: &Path, binary: PathBuf) -> eyre::Result<()> {
     let building_dir = get_building_dir(get_root_dir()?);
 
     if !is_source_updated(&building_dir, &binary) {
-        println!("staccato-build source not updated, {} upgrade", "skip".green());
+        println!(
+            "staccato-build source not updated, {} upgrade",
+            "skip".green()
+        );
         Ok(())
     } else {
         println!("staccato-build source updated, {}...", "upgrading".blue());
@@ -421,7 +518,7 @@ pub fn upgrade(root:&Path,binary:PathBuf) -> eyre::Result<()> {
 
         // run again
 
-        if let Err(err) = run_sb(){
+        if let Err(err) = run_sb() {
             println!("failed to run sb: {}", err);
             std::process::exit(1);
         }
@@ -429,16 +526,19 @@ pub fn upgrade(root:&Path,binary:PathBuf) -> eyre::Result<()> {
     }
 }
 
-pub fn clean(opts:&BuildingOpts) -> eyre::Result<()> {
+pub fn clean(opts: &BuildingOpts) -> eyre::Result<()> {
     let dir = get_build_dir(opts);
 
-    if dir.is_dir(){
-        println!("remove build dir: {}",dir.display().bright_white());
+    if dir.is_dir() {
+        println!("remove build dir: {}", dir.display().bright_white());
         fs::remove_dir_all(&dir)?;
         fs::create_dir_all(&dir)?;
-    }
-    else{
-        println!("build dir {} not exists, {}","skip".yellow(),dir.display().bright_white());
+    } else {
+        println!(
+            "build dir {} not exists, {}",
+            "skip".yellow(),
+            dir.display().bright_white()
+        );
     }
 
     Ok(())
@@ -446,17 +546,18 @@ pub fn clean(opts:&BuildingOpts) -> eyre::Result<()> {
 
 fn real_main() -> eyre::Result<()> {
     let mut updated = false;
-    if let Ok(root) = get_root_dir() && let Ok(binary) = env::current_exe(){
-        upgrade(&root,binary)?; // 先手升级
+    if let Ok(root) = get_root_dir()
+        && let Ok(binary) = env::current_exe()
+    {
+        upgrade(&root, binary)?; // 先手升级
         updated = true;
     }
 
     let args = Cli::parse();
 
-    let root = if let Some(root) = args.root{
+    let root = if let Some(root) = args.root {
         PathBuf::from(root)
-    }
-    else{
+    } else {
         get_root_dir()?
     };
 
@@ -466,13 +567,18 @@ fn real_main() -> eyre::Result<()> {
         if let Ok(binary) = binary {
             upgrade(&root, binary)?;
         } else {
-            println!("{} to get {}, {} upgrade check", "failed".red(), "current exe path".cyan(), "skip".yellow());
+            println!(
+                "{} to get {}, {} upgrade check",
+                "failed".red(),
+                "current exe path".cyan(),
+                "skip".yellow()
+            );
         }
     }
 
-    let opts = BuildingOpts{
+    let opts = BuildingOpts {
         root: root.clone(),
-        platform: Platform{
+        platform: Platform {
             os: args.target.target_os,
             architecture: args.target.target_architecture,
         },
@@ -480,28 +586,28 @@ fn real_main() -> eyre::Result<()> {
     };
 
     // execute
-    match args.commands{
+    match args.commands {
         Commands::BuildGlue(cmd) => {
             cmd.invoke(&opts)?;
         }
         Commands::BuildRust(cmd) => {
             cmd.invoke(&opts)?;
-        },
+        }
         Commands::BuildManaged(cmd) => {
             cmd.invoke(&opts)?;
-        },
-        Commands::BuildAll{
+        }
+        Commands::BuildAll {
             glue,
             rust,
             managed,
         } => {
-            BuildGlue::invoke(glue,&opts)?;
-            BuildRust::invoke(rust,&opts)?;
-            BuildManaged::invoke(managed,&opts)?;
+            BuildGlue::invoke(glue, &opts)?;
+            BuildRust::invoke(rust, &opts)?;
+            BuildManaged::invoke(managed, &opts)?;
         }
     }
 
-    if args.clean{
+    if args.clean {
         clean(&opts)?;
     }
 
@@ -512,7 +618,7 @@ fn main() {
     let now = std::time::Instant::now();
 
     _ = color_eyre::install()
-        .inspect_err(|e| eprintln!("{} to install color-eyre {:?}","failed".red(), e))
+        .inspect_err(|e| eprintln!("{} to install color-eyre {:?}", "failed".red(), e))
         .unwrap_or(());
 
     let result = real_main();
