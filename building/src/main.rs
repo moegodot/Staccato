@@ -110,6 +110,8 @@ impl BuildRust{
                 Configuration::Debug => "dev".into(),
                 Configuration::Release => "release".into(),
             },
+            "--target-dir".into(),
+            get_building_dir(&opts).to_string_lossy().to_string()
         ];
 
         if let Some(target) = opts.platform.rust_target_triple() {
@@ -270,7 +272,8 @@ pub fn run<F>(exe:&Path, work_dir:&Path, args:impl Iterator<Item = String>, chec
 
     f(&mut cmd);
 
-    println!("spawn in {:?}: {:?} {}", work_dir.bright_white(), exe.bright_cyan(), collected.join(" ").bright_blue());
+    println!("{}",
+    format!("spawn in {:?}: {:?} {}", work_dir.bright_white(), exe.bright_cyan(), collected.join(" ").bright_blue()).underline());
 
     let mut process = cmd.spawn()?;
 
