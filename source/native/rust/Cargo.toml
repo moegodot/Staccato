@@ -1,0 +1,10 @@
+[workspace.package]
+version = "0.1.0"
+authors = ["MoeGodot <me@kawayi.moe>"]
+description = "The post-modern graph&&game framework&&engine that your mom warned you about."
+documentation = "https://github.com/moegodot/Staccato"
+repository = "https://github.com/moegodot/Staccato"
+homepage = "https://github.com/moegodot/Staccato"
+edition = "2024"
+license = "GPL-3.0-or-later"
+

@@ -1,0 +1,18 @@
+[package]
+name = "staccato_building"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "sb"
+path = "src/main.rs"
+test = false
+bench = false
+
+[dependencies]
+clap = {version = "4.5.54", features = ["derive", "unicode","wrap_help","string","color","std","help","usage","error-context","suggestions"], default-features = false}
+owo-colors = "4.2.3"
+color-eyre = "0.6.5"
+exit-code = "1.0.0"
+humantime = "2.3.0"
+ignore = "0.4.25"
