@@ -5,17 +5,15 @@ use crate::configuration::Configuration;
 use crate::platform::{Architecture, Os, Platform, is_os};
 use ::color_eyre::eyre;
 use ::owo_colors::OwoColorize;
-use ::std::ops::Index;
 use clap::{Args, Parser, Subcommand};
 use color_eyre::eyre::{Context, ContextCompat, eyre};
 use ignore::WalkBuilder;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::SystemTime;
 use std::{env, fs};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct BuildingOpts {
+pub struct BuildingOpts {
     root: PathBuf,
     platform: Platform,
     configuration: Configuration,
@@ -84,12 +82,14 @@ pub enum Commands {
         #[command(flatten)]
         managed: BuildManaged,
     },
+    #[command()]
+    UpdateVersion(UpdateVersion),
 }
 
 #[derive(Args, Debug, Clone)]
 pub struct BuildGlue {}
 impl BuildGlue {
-    pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
+    pub fn invoke(self, _opts: &BuildingOpts) -> eyre::Result<()> {
         Ok(())
     }
 }
@@ -132,7 +132,8 @@ impl UpdateVersion {
     pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
         let version_file = opts.root.join(VERSION_FILE_NAME);
 
-        let version = fs::read_to_string(version_file)?.trim();
+        let version = fs::read_to_string(&version_file)?.trim().to_string();
+        println!("update version to {}", version.bright_white());
 
         // write to source/native/rust/Cargo.toml
         {
@@ -152,6 +153,27 @@ impl UpdateVersion {
 
             fs::write(&cargo_toml_file, new_cargo_toml)?;
         }
+        println!("update {}", "Cargo.toml".bright_white());
+        // write to source/native/managed/Directory.Build.props
+        {
+            let start_mark = "<!-- Version is mantained by sb,do not edit manually - start -->";
+            let end_mark = "<!-- Version is mantained by sb,do not edit manually - end -->";
+
+            let props_file =
+                get_managed_source_dir(opts.root.as_path()).join("Directory.Build.props");
+
+            let props = fs::read_to_string(&props_file)?;
+
+            let start_index = props.find(start_mark).unwrap();
+            let end_index = props.find(end_mark).unwrap();
+
+            let new_props = props[..(start_index + start_mark.len())].to_string();
+            let new_props = format!("{}\n    <Version>{}</Version>\n    ", new_props, version);
+            let new_props = format!("{}{}", new_props, &props[end_index..]);
+
+            fs::write(&props_file, new_props)?;
+        }
+        println!("update {}", "Directory.Build.props".bright_white());
 
         Ok(())
     }
@@ -467,6 +489,7 @@ pub fn install_sb(source: &Path) -> eyre::Result<()> {
             "install".into(),
             "--path".into(),
             source.to_string_lossy().to_string(),
+            "--quiet".into(),
         ]
         .into_iter(),
         true,
@@ -500,7 +523,7 @@ pub fn run_sb() -> eyre::Result<()> {
     Ok(())
 }
 
-pub fn upgrade(root: &Path, binary: PathBuf) -> eyre::Result<()> {
+pub fn upgrade(_root: &Path, binary: PathBuf) -> eyre::Result<()> {
     let building_dir = get_building_dir(get_root_dir()?);
 
     if !is_source_updated(&building_dir, &binary) {
@@ -604,6 +627,9 @@ fn real_main() -> eyre::Result<()> {
             BuildGlue::invoke(glue, &opts)?;
             BuildRust::invoke(rust, &opts)?;
             BuildManaged::invoke(managed, &opts)?;
+        }
+        Commands::UpdateVersion(cmd) => {
+            cmd.invoke(&opts)?;
         }
     }
 

@@ -80,6 +80,7 @@ pub fn is_os(os:Os) -> bool{
     }
 }
 
+#[allow(dead_code)]
 pub fn is_architecture(arch:Architecture) -> bool{
     let current = ::std::env::consts::ARCH;
 

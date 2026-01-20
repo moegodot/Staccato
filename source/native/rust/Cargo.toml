@@ -12,7 +12,7 @@ resolver = "3"
 
 [workspace.package]
 # Version is mantained by sb,do not edit manually - start
-version = "0.1.0"
+version = "0.1.1"
 # Version is mantained by sb,do not edit manually - end
 authors = ["MoeGodot <me@kawayi.moe>"]
 description = "The post-modern graph&&game framework&&engine that your mom warned you about."

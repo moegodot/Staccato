@@ -1,0 +1,19 @@
+<!-- source/managed/Directory.Build.props -->
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+
+    <!-- Version is mantained by sb,do not edit manually - start -->
+    <Version>0.1.1</Version>
+    <!-- Version is mantained by sb,do not edit manually - end -->
+    <Authors>MoeGodot</Authors>
+    <Company>MoeGodot</Company>
+
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <BaseOutputPath>$(MSBuildThisFileDirectory)/../../build/managed/$(MSBuildProjectName)/bin/</BaseOutputPath>
+  </PropertyGroup>
+</Project>
+

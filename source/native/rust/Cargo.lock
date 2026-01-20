@@ -4,36 +4,36 @@ version = 4
 
 [[package]]
 name = "staccato"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "staccato-asset"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "staccato-core"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "staccato-dotnet"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "staccato-hal"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "staccato-layout"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "staccato-shared"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "staccato-text"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "staccato-ui"
-version = "0.1.0"
+version = "0.1.1"
