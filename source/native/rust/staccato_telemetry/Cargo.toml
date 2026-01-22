@@ -1,5 +1,5 @@
 [package]
-name = "staccato-hal"
+name = "staccato-telemetry"
 version.workspace = true
 authors.workspace = true
 description.workspace = true
@@ -10,17 +10,11 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-staccato-core.workspace = true
-staccato-platform-api.workspace = true
-
-sdl3-sys.workspace = true
-raw-window-handle.workspace = true
-wgpu.workspace = true
-
+tracing.workspace = true
+tracing-log.workspace = true
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true
 eyre.workspace = true
-thiserror.workspace = true
-
-pollster.workspace = true
 
 [lints]
 workspace = true

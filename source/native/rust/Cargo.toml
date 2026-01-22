@@ -1,13 +1,20 @@
 [workspace]
-members = ["staccato", "staccato_asset",
+members = ["staccato",
+    "staccato_asset",
     "staccato_core",
     "staccato_dotnet",
     "staccato_hal",
     "staccato_layout",
-    "staccato_shared",
+    "staccato_shared", "staccato_telemetry",
     "staccato_text",
-    "staccato_ui"]
-default-members = ["staccato"]
+    "staccato_telemetry",
+    "staccato_ui",
+    "staccato_sample_playground",
+    "staccato_application",
+    "staccato_platform_api",
+    "staccato_render_api",
+    "staccato_render_wgpu"]
+default-members = ["staccato_sample_playground"]
 resolver = "3"
 
 [workspace.package]
@@ -37,6 +44,8 @@ bare_urls = "deny"
 unescaped_backticks = "deny"
 
 [workspace.dependencies]
+# our crates
+staccato-telemetry = { path = "./staccato_telemetry" }
 staccato-shared = { path = "./staccato_shared" }
 staccato-core = { path = "./staccato_core" }
 staccato-asset = { path = "./staccato_asset" }
@@ -45,9 +54,45 @@ staccato-text = { path = "./staccato_text" }
 staccato-layout = { path = "./staccato_layout" }
 staccato-ui = { path = "./staccato_ui" }
 staccato-dotnet = { path = "./staccato_dotnet" }
+staccato-platform-api = { path="./staccato_platform_api" }
+staccato-render-api = { path="./staccato_render_api" }
+staccato-render-wgpu = { path="./staccato_render_wgpu" }
+staccato-sample-playground = { path="./staccato_sample_playground" }
+
+# telemetry
+log = "0.4"
+tracing = {version = "0.1", features = ["max_level_trace","release_max_level_info"] }
+tracing-log = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "registry", "json"] }
+tracing-appender = "0.2"
+
+# utilities
+num-traits = "0.2"
+num-derive = "0.4"
+bitflags = "2.10"
+
+# error handle
+thiserror = "2.0"
+eyre = "0.6"
+color-eyre = "0.6"
+
+# system && render
+sdl3-sys =  { version = "0.6.0",features = ["build-from-source"] }
+wgpu = { version = "28.0.0", default-features = false, features = [
+    "strict_asserts",
+    "std",
+    "parking_lot",
+    "vulkan",
+    "metal",
+    "wgsl",
+] }
+raw-window-handle = "0.6.2"
+
+# io
+pollster = "0.4.0"
 
 [profile.dev]
-opt-level = 0
+opt-level = 2
 debug = true
 split-debuginfo = "unpacked"
 lto = false

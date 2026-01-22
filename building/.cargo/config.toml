@@ -1,2 +1,3 @@
 [unstable]
-mtime-on-use = true
+target-dir = "../build/native"
+
