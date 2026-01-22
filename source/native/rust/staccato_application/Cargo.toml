@@ -10,6 +10,8 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+staccato-shared.workspace = true
+staccato-hal.workspace = true
 
 [lints]
 workspace = true

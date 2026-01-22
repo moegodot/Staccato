@@ -1,10 +1,10 @@
+use crate::Fallible::Fallible;
 
 pub trait HasSize {
     type SizeType;
-    fn try_get_size(&mut self) -> Self::SizeType;
+    fn get_size(&self) -> Self::SizeType;
 }
 
-pub trait Resizable: HasSize {
-    type Error: std::error::Error + Send + Sync + 'static;
+pub trait Resizable: HasSize + Fallible {
     fn try_set_size(&mut self,size: Self::SizeType) -> Result<(),Self::Error>;
 }

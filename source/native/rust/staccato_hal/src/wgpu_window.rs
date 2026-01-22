@@ -1,9 +1,12 @@
+use std::mem::ManuallyDrop;
 use eyre::{Context, Report};
 use pollster::FutureExt;
 use thiserror::Error;
 use wgpu::{Device, Queue, Surface, SurfaceConfiguration, SurfaceTarget};
+use staccato_core::spatial::HasSize;
+use staccato_platform_api::window::WindowBackend;
 use crate::error::SdlError;
-use crate::window::{Window, WindowOption};
+use crate::window::{RawWindowHandler, Window, WindowOption};
 
 #[derive(Debug,Error)]
 pub enum WgpuWindowError{
@@ -15,28 +18,39 @@ pub enum WgpuWindowError{
 
 #[derive(Debug,Clone)]
 pub struct WgpuWindowOption{
-    window: WindowOption,
-
 }
 
 pub struct WgpuWindow<'window>{
-    window: Box<Window>,
-    surface:Surface<'window>,
-    device:Device,
-    queue:Queue,
-    config: SurfaceConfiguration,
+    window: ManuallyDrop<Box<Window>>,
+    surface:ManuallyDrop<Surface<'window>>,
+    device:ManuallyDrop<Device>,
+    queue:ManuallyDrop<Queue>,
+    config: ManuallyDrop<SurfaceConfiguration>,
+}
+
+impl Drop for WgpuWindow<'_>{
+    fn drop(&mut self) {
+        unsafe {
+            ManuallyDrop::drop(&mut self.surface);
+            ManuallyDrop::drop(&mut self.queue);
+            ManuallyDrop::drop(&mut self.config);
+            ManuallyDrop::drop(&mut self.device);
+            ManuallyDrop::drop(&mut self.window);
+        }
+    }
 }
 
 impl<'window> WgpuWindow<'window>{
-    pub fn new(option:WgpuWindowOption) -> Result<Box<Self>,WgpuWindowError> {
-        let window = Box::new(Window::new(option.window)?);
+
+    pub fn from_window(option:WgpuWindowOption, window: Window) -> Result<Self,WgpuWindowError> {
+        let window = Box::from(window);
 
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::METAL | wgpu::Backends::VULKAN,
             ..Default::default()
         });
 
-        let surface = instance.create_surface(SurfaceTarget::Window(window.handles())).unwrap();
+        let surface = instance.create_surface(SurfaceTarget::Window(window.window().handler())).unwrap();
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -59,7 +73,7 @@ impl<'window> WgpuWindow<'window>{
         ).block_on().unwrap();
 
         let caps = surface.get_capabilities(&adapter);
-        let mut size = window.size()?;
+        let mut size = window.get_size();
         size.width = size.width.max(1);
         size.height = size.height.max(1);
         let config = wgpu::SurfaceConfiguration {
@@ -76,14 +90,20 @@ impl<'window> WgpuWindow<'window>{
         surface.configure(&device, &config);
 
         Ok(
-            Box::new(Self {
-                window,
-                surface,
-                device,
-                queue,
-                config,
-            })
+            Self {
+                window:ManuallyDrop::new(window),
+                surface:ManuallyDrop::new(surface),
+                device:ManuallyDrop::new(device),
+                queue:ManuallyDrop::new(queue),
+                config:ManuallyDrop::new(config),
+            }
         )
+    }
+
+    pub fn new(option:WgpuWindowOption,window_option: WindowOption) -> Result<Self,WgpuWindowError> {
+        let window = Window::new(window_option)?;
+
+        Self::from_window(option,window)
     }
 
     pub fn window(&self) -> &Box<Window> {

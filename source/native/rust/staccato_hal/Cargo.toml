@@ -11,6 +11,7 @@ license.workspace = true
 
 [dependencies]
 staccato-core.workspace = true
+staccato-shared.workspace = true
 staccato-platform-api.workspace = true
 
 sdl3-sys.workspace = true
@@ -19,6 +20,10 @@ wgpu.workspace = true
 
 eyre.workspace = true
 thiserror.workspace = true
+
+smol_str.workspace = true
+
+num-traits.workspace = true
 
 pollster.workspace = true
 
