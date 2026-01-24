@@ -1,5 +1,4 @@
 use bitflags::bitflags;
-use num_derive::{FromPrimitive, ToPrimitive};
 
 bitflags! {
     /// 按键修饰符状态的位掩码。

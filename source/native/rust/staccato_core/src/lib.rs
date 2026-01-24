@@ -6,4 +6,6 @@ pub mod keycode;
 pub mod scancode;
 pub mod keymod;
 pub mod mouse;
-pub mod Fallible;
+pub mod fallible;
+pub mod tickable;
+pub mod time_service;

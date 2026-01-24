@@ -1,10 +1,6 @@
-use ::std::{ops::Deref, ptr::NonNull};
+use ::std::ptr::NonNull;
 #[cfg(target_os = "macos")]
 use std::ffi::c_void;
-#[cfg(target_os = "windows")]
-use std::num::NonZeroIsize;
-use std::{mem::ManuallyDrop, ptr};
-use std::num::NonZeroIsize;
 use ::staccato_core::rect::Size;
 use crate::error::SdlError;
 use raw_window_handle::{
@@ -18,9 +14,8 @@ use sdl3_sys::{
     },
 };
 use smol_str::{SmolStr, ToSmolStr};
-use staccato_core::Fallible::Fallible;
+use staccato_core::fallible::Fallible;
 use staccato_core::id::HasId;
-use staccato_core::rect::Point;
 use staccato_core::spatial::{HasSize, Resizable};
 use staccato_platform_api::window::{WindowBackend, WindowId};
 
@@ -199,13 +194,13 @@ impl WindowHandler {
                 let hwnd = sdl3_sys::properties::SDL_GetPointerProperty(id, SDL_PROP_WINDOW_WIN32_HWND_POINTER, core::ptr::null_mut());
                 let hinstance = sdl3_sys::properties::SDL_GetPointerProperty(id, SDL_PROP_WINDOW_WIN32_INSTANCE_POINTER, core::ptr::null_mut());
 
-                let hwnd = match NonZeroIsize::new(hwnd as isize) {
+                let hwnd = match std::num::NonZeroIsize::new(hwnd as isize) {
                     Some(hwnd) => hwnd,
                     None => {
                         return Err(error("missing window handle:hwnd"));
                     }
                 };
-                let hinstance = match NonZeroIsize::new(hinstance as isize) {
+                let hinstance = match std::num::NonZeroIsize::new(hinstance as isize) {
                     Some(hinstance) => hinstance,
                     None => {
                         return Err(error("missing window handle:hinstance"));
@@ -215,12 +210,12 @@ impl WindowHandler {
                 let mut handle = Win32WindowHandle::new(hwnd);
                 handle.hinstance = hinstance.into();
 
-                let window_handle = RawWindowHandle::Win32(handle);
+                let _window_handle = RawWindowHandle::Win32(handle);
 
-                let display_handle = RawDisplayHandle::Windows(WindowsDisplayHandle::new());
+                let _display_handle = RawDisplayHandle::Windows(WindowsDisplayHandle::new());
 
                 #[cfg(target_os = "windows")]
-                return Ok(Self { window, window_handle, display_handle, hwnd, hinstance,id,is_open });
+                return Ok(Self { window, window_handle: _window_handle, display_handle: _display_handle, hwnd, hinstance,id,is_open });
                 #[cfg(not(target_os = "windows"))]
                 unreachable!();
             } else {

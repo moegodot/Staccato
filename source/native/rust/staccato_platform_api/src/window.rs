@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use smol_str::SmolStr;
-use staccato_core::Fallible::Fallible;
+use staccato_core::fallible::Fallible;
 use staccato_core::id::HasId;
 use staccato_core::rect::Size;
 use staccato_core::spatial::{Resizable};

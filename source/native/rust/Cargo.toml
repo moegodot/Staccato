@@ -5,7 +5,8 @@ members = ["staccato",
     "staccato_dotnet",
     "staccato_hal",
     "staccato_layout",
-    "staccato_shared", "staccato_telemetry",
+    "staccato_shared",
+    "staccato_telemetry",
     "staccato_text",
     "staccato_telemetry",
     "staccato_ui",
@@ -53,6 +54,7 @@ staccato-hal = { path = "./staccato_hal" }
 staccato-text = { path = "./staccato_text" }
 staccato-layout = { path = "./staccato_layout" }
 staccato-ui = { path = "./staccato_ui" }
+staccato-application = { path = "./staccato_application" }
 staccato-dotnet = { path = "./staccato_dotnet" }
 staccato-platform-api = { path="./staccato_platform_api" }
 staccato-render-api = { path="./staccato_render_api" }
@@ -60,9 +62,7 @@ staccato-render-wgpu = { path="./staccato_render_wgpu" }
 staccato-sample-playground = { path="./staccato_sample_playground" }
 
 # telemetry
-log = "0.4"
 tracing = {version = "0.1", features = ["max_level_trace","release_max_level_info"] }
-tracing-log = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "registry", "json"] }
 tracing-appender = "0.2"
 
@@ -95,7 +95,7 @@ raw-window-handle = "0.6.2"
 pollster = "0.4.0"
 
 [profile.dev]
-opt-level = 2
+opt-level = 0
 debug = true
 split-debuginfo = "unpacked"
 lto = false

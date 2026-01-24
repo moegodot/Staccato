@@ -1,5 +1,5 @@
 [package]
-name = "staccato_application"
+name = "staccato-application"
 version.workspace = true
 authors.workspace = true
 description.workspace = true
@@ -10,7 +10,16 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+staccato-telemetry.workspace = true
+staccato-core.workspace = true
 staccato-shared.workspace = true
+staccato-render-api.workspace = true
+staccato-platform-api.workspace = true
+
+eyre.workspace = true
+
+thiserror.workspace = true
+sdl3-sys.workspace = true
 staccato-hal.workspace = true
 
 [lints]

@@ -1,4 +1,4 @@
-use crate::Fallible::Fallible;
+use crate::fallible::Fallible;
 
 pub trait HasSize {
     type SizeType;

@@ -1,4 +1,3 @@
-use ::std::num::TryFromIntError;
 use std::ops::{Add, Sub};
 
 /// The type of pixel unit.

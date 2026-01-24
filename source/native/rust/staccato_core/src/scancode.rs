@@ -1,4 +1,3 @@
-use std::convert::TryFrom;
 use num_derive::{FromPrimitive, ToPrimitive};
 
 #[repr(u32)]
