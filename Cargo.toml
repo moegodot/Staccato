@@ -1,0 +1,155 @@
+[workspace]
+members = [
+    "building",
+    "source/native/rust/staccato",
+    "source/native/rust/staccato_asset",
+    "source/native/rust/staccato_core",
+    "source/native/rust/staccato_dotnet",
+    "source/native/rust/staccato_hal",
+    "source/native/rust/staccato_layout",
+    "source/native/rust/staccato_shared",
+    "source/native/rust/staccato_telemetry",
+    "source/native/rust/staccato_text",
+    "source/native/rust/staccato_telemetry",
+    "source/native/rust/staccato_ui",
+    "source/native/rust/staccato_sample_playground",
+    "source/native/rust/staccato_application",
+    "source/native/rust/staccato_platform_api",
+    "source/native/rust/staccato_render_api",
+    "source/native/rust/staccato_render_wgpu",
+]
+default-members = []
+resolver = "3"
+
+[workspace.package]
+# Version is mantained by sb,do not edit manually - start
+version = "0.1.1"
+# Version is mantained by sb,do not edit manually - end
+authors = ["MoeGodot <me@kawayi.moe>"]
+description = "The post-modern graph&&game framework&&engine that your mom warned you about."
+documentation = "https://github.com/moegodot/Staccato"
+repository = "https://github.com/moegodot/Staccato"
+homepage = "https://github.com/moegodot/Staccato"
+edition = "2024"
+license = "GPL-3.0-or-later"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
+[workspace.lints.rustdoc]
+missing_docs = "deny"
+broken_intra_doc_links = "deny"
+invalid_codeblock_attributes = "deny"
+invalid_html_tags = "deny"
+invalid_rust_codeblocks = "deny"
+bare_urls = "deny"
+unescaped_backticks = "deny"
+
+[workspace.dependencies]
+# our crates
+staccato-telemetry = { path = "source/native/rust/staccato_telemetry" }
+staccato-shared = { path = "source/native/rust/staccato_shared" }
+staccato-core = { path = "source/native/rust/staccato_core" }
+staccato-asset = { path = "source/native/rust/staccato_asset" }
+staccato-hal = { path = "source/native/rust/staccato_hal" }
+staccato-text = { path = "source/native/rust/staccato_text" }
+staccato-layout = { path = "source/native/rust/staccato_layout" }
+staccato-ui = { path = "source/native/rust/staccato_ui" }
+staccato-application = { path = "source/native/rust/staccato_application" }
+staccato-dotnet = { path = "source/native/rust/staccato_dotnet" }
+staccato-platform-api = { path = "source/native/rust/staccato_platform_api" }
+staccato-render-api = { path = "source/native/rust/staccato_render_api" }
+staccato-render-wgpu = { path = "source/native/rust/staccato_render_wgpu" }
+staccato-sample-playground = { path = "source/native/rust/staccato_sample_playground" }
+
+# telemetry
+tracing = { version = "0.1", features = [
+    "max_level_trace",
+    "release_max_level_info",
+] }
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "fmt",
+    "registry",
+    "json",
+] }
+tracing-appender = "0.2"
+
+# utilities
+num-traits = "0.2"
+num-derive = "0.4"
+bitflags = "2.10"
+
+# data structure
+smol_str = "0.3"
+
+# error handle
+thiserror = "2.0"
+eyre = "0.6"
+color-eyre = "0.6"
+
+# system && render
+sdl3-sys = { version = "0.6.0", features = ["build-from-source"] }
+wgpu = { version = "28.0.0", default-features = false, features = [
+    "strict_asserts",
+    "std",
+    "parking_lot",
+    "vulkan",
+    "metal",
+    "wgsl",
+] }
+raw-window-handle = "0.6.2"
+
+# io
+pollster = "0.4.0"
+
+# unix
+exit-code = "1"
+
+# cli
+owo-colors = "4.2.3"
+humantime = "2.3.0"
+clap = { version = "4.5.54", features = [
+    "derive",
+    "unicode",
+    "wrap_help",
+    "string",
+    "color",
+    "std",
+    "help",
+    "usage",
+    "error-context",
+    "suggestions",
+], default-features = false }
+
+# xtask
+devx-pre-commit = "0.5.0"
+
+[profile.dev]
+opt-level = 0
+debug = true
+split-debuginfo = "unpacked"
+lto = false
+panic = "unwind"
+strip = "none"
+incremental = true
+
+[profile.dev.package."*"]
+opt-level = 0
+
+[profile.test]
+inherits = "dev"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+debug = false
+incremental = false
+
+[profile.bench]
+inherits = "release"

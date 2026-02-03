@@ -2,6 +2,7 @@
 <Project>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14.0</LangVersion>
 
     <!-- Version is mantained by sb,do not edit manually - start -->
     <Version>0.1.1</Version>
@@ -13,7 +14,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
-    <BaseOutputPath>$(MSBuildThisFileDirectory)/../../build/managed/$(MSBuildProjectName)/bin/</BaseOutputPath>
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)/../../build/managed/$(Configuration)/$(MSBuildProjectName)</ArtifactsPath>
   </PropertyGroup>
 </Project>
-

@@ -1,3 +1,4 @@
 #!/bin/sh
-cargo install --path ./building/
-
+cd source/native/rust
+cargo install --package building
+cd ../..

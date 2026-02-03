@@ -10,9 +10,9 @@ test = false
 bench = false
 
 [dependencies]
-clap = {version = "4.5.54", features = ["derive", "unicode","wrap_help","string","color","std","help","usage","error-context","suggestions"], default-features = false}
-owo-colors = "4.2.3"
-color-eyre = "0.6.5"
-exit-code = "1.0.0"
-humantime = "2.3.0"
-ignore = "0.4.25"
+eyre.workspace = true
+color-eyre.workspace = true
+clap.workspace = true
+owo-colors.workspace = true
+exit-code.workspace = true
+humantime.workspace = true

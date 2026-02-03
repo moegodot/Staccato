@@ -1,33 +1,26 @@
 mod configuration;
+mod hooks;
 mod platform;
 
 use crate::configuration::Configuration;
-use crate::platform::{Architecture, Os, Platform, is_os};
+use crate::platform::{Architecture, Os, is_os};
 use ::color_eyre::eyre;
 use ::owo_colors::OwoColorize;
 use clap::{Args, Parser, Subcommand};
 use color_eyre::eyre::{Context, ContextCompat, eyre};
-use ignore::WalkBuilder;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
 use std::{env, fs};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuildingOpts {
     root: PathBuf,
-    platform: Platform,
     configuration: Configuration,
 }
 
 impl AsRef<Path> for BuildingOpts {
     fn as_ref(&self) -> &Path {
         &self.root
-    }
-}
-
-impl AsRef<Platform> for BuildingOpts {
-    fn as_ref(&self) -> &Platform {
-        &self.platform
     }
 }
 
@@ -43,17 +36,8 @@ struct Cli {
     #[arg(short, long, global = true)]
     pub root: Option<String>,
 
-    #[arg(short, long, default_value_t = true)]
-    pub clean: bool,
-
-    #[arg(short, long, default_value_t = true)]
-    pub upgrade: bool,
-
     #[arg(value_enum,short, long, default_value_t = crate::configuration::Configuration::Debug, global=true)]
     pub configuration: Configuration,
-
-    #[command(flatten)]
-    pub target: TargetPlatformArgs,
 
     #[command(subcommand)]
     pub commands: Commands,
@@ -68,22 +52,17 @@ struct TargetPlatformArgs {
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     #[command()]
-    BuildGlue(BuildGlue),
+    UpdateVersion(UpdateVersion),
+    #[command()]
+    Clean(Clean),
     #[command()]
     BuildRust(BuildRust),
     #[command()]
     BuildManaged(BuildManaged),
-    #[command(visible_alias = "build")]
-    BuildAll {
-        #[command(flatten)]
-        glue: BuildGlue,
-        #[command(flatten)]
-        rust: BuildRust,
-        #[command(flatten)]
-        managed: BuildManaged,
-    },
     #[command()]
-    UpdateVersion(UpdateVersion),
+    PreCommit(hooks::PreCommit),
+    #[command()]
+    PrePush(hooks::PrePush),
 }
 
 #[derive(Args, Debug, Clone)]
@@ -98,12 +77,12 @@ impl BuildGlue {
 pub struct BuildRust {}
 impl BuildRust {
     pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
-        let source = get_rust_source_dir(opts.root.as_path());
+        let source = opts.root.as_path();
 
         let cargo =
             which("cargo".into(), |a, b| a.cmp(b)).wrap_err("failed to find cargo in PATH")?;
 
-        let mut args = vec![
+        let args = vec![
             "build".into(),
             "--workspace".into(),
             "--profile".into(),
@@ -111,14 +90,7 @@ impl BuildRust {
                 Configuration::Debug => "dev".into(),
                 Configuration::Release => "release".into(),
             },
-            "--target-dir".into(),
-            get_build_dir(&opts).to_string_lossy().to_string(),
         ];
-
-        if let Some(target) = opts.platform.rust_target_triple() {
-            args.push("--target".into());
-            args.push(target.into());
-        }
 
         run(&cargo, &source, args.into_iter(), true, |_| {})?;
 
@@ -197,20 +169,6 @@ impl BuildManaged {
             vec![
                 "build".into(),
                 source.to_string_lossy().to_string(),
-                /*
-                enable when AOT,but we needn't now
-                "--runtime".into(),
-                format!("{}-{}",
-                match opts.platform.os.unwrap_or_default(){
-                    Os::Windows => "win",
-                    Os::Linux => "linux",
-                    Os::MacOS => "osx",
-                },
-                match opts.platform.architecture.unwrap_or_default(){
-                    Architecture::X64 => "x64",
-                    Architecture::Arm64 => "arm64",
-                }),
-                */
                 "--framework".into(),
                 self.framework,
                 "--configuration".into(),
@@ -223,68 +181,6 @@ impl BuildManaged {
 
         Ok(())
     }
-}
-
-fn copy_sb_to_old(exe_path: &Path) -> eyre::Result<()> {
-    if cfg!(target_os = "windows") && exe_path.exists() {
-        let mut old_path = exe_path.to_path_buf();
-        old_path.set_extension("exe.old");
-        let _ = fs::remove_file(&old_path);
-        println!(
-            "move {} to {}",
-            exe_path.display().bright_white(),
-            old_path.display().bright_white()
-        );
-        fs::rename(exe_path, old_path)?;
-    }
-
-    Ok(())
-}
-
-/// 检查源目录是否比目标二进制文件更新
-///
-/// # 参数
-/// * `source_dir` - 源码根目录（例如 ./building）
-/// * `binary_path` - 编译出的二进制路径（例如 ./target/release/sb）
-fn is_source_updated(source_dir: &Path, binary_path: &Path) -> bool {
-    // 1. 如果二进制文件不存在，必然需要更新
-    let binary_metadata = match fs::metadata(binary_path) {
-        Ok(m) => m,
-        Err(_) => return true,
-    };
-
-    let binary_mtime = binary_metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
-
-    // 2. 使用 ignore crate 遍历源码目录
-    // 它会自动处理 .gitignore 和隐藏文件
-    let walker = WalkBuilder::new(source_dir)
-        .standard_filters(true) // 启用 .gitignore, .ignore 等过滤
-        .hidden(true) // 忽略隐藏文件
-        .build();
-
-    for result in walker {
-        match result {
-            Ok(entry) => {
-                // 只检查文件
-                if entry.file_type().map_or(false, |ft| ft.is_file()) {
-                    if let Ok(metadata) = entry.metadata() {
-                        if let Ok(mtime) = metadata.modified() {
-                            // 如果有任何一个文件的修改时间晚于二进制文件
-                            if mtime > binary_mtime {
-                                // 打印一下哪个文件变了，方便调试
-                                println!("trigger sb upgrade by: {:?}", entry.path());
-                                return true;
-                            }
-                        }
-                    }
-                }
-            }
-            Err(err) => eprintln!("get error when check staccato-build source mtime: {}", err),
-        }
-    }
-
-    // 遍历结束没发现更新的文件
-    false
 }
 
 pub fn which<F>(exe: String, sort_func: F) -> Option<std::path::PathBuf>
@@ -385,6 +281,19 @@ where
     Ok(())
 }
 
+pub fn run_fast(
+    exe: &str,
+    work_dir: impl AsRef<Path>,
+    args: impl Iterator<Item = String>,
+    check: bool,
+) -> eyre::Result<()> {
+    let exe = which(exe.to_string(), |a, b| a.cmp(b)).unwrap_or(PathBuf::from(exe));
+
+    run(exe.as_path(), work_dir.as_ref(), args, check, |_| {})?;
+
+    Ok(())
+}
+
 static VERSION_FILE_NAME: &str = "staccato.version";
 
 pub fn get_root_dir() -> eyre::Result<PathBuf> {
@@ -449,18 +358,7 @@ pub fn get_managed_source_dir(root: impl AsRef<Path>) -> PathBuf {
 }
 
 pub fn get_opts_dir(opts: &BuildingOpts, name: &str) -> PathBuf {
-    let architecture = opts.platform.architecture.unwrap_or_default();
-    let architecture = architecture.as_ref();
-    let os = opts.platform.os.unwrap_or_default();
-    let os = os.as_ref();
-    let configuration = opts.configuration.as_ref();
-
-    let result = opts
-        .root
-        .join(name)
-        .join(architecture)
-        .join(os)
-        .join(configuration);
+    let result = opts.root.join(name);
 
     fs::create_dir_all(&result).unwrap();
 
@@ -475,107 +373,32 @@ pub fn get_install_dir(opts: &BuildingOpts) -> PathBuf {
     get_opts_dir(opts, "install")
 }
 
-pub fn get_artifact_dir(opts: &BuildingOpts) -> PathBuf {
-    get_opts_dir(opts, "artifact")
+pub fn get_output_dir(opts: &BuildingOpts) -> PathBuf {
+    get_opts_dir(opts, "dist")
 }
 
-pub fn install_sb(source: &Path) -> eyre::Result<()> {
-    let cargo = which("cargo".into(), |a, b| a.cmp(b)).wrap_err("failed to find cargo in PATH")?;
+#[derive(Args, Debug, Clone)]
+pub struct Clean {}
+impl Clean {
+    pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
+        let dir = get_build_dir(opts);
 
-    run(
-        &cargo,
-        source,
-        vec![
-            "install".into(),
-            "--path".into(),
-            source.to_string_lossy().to_string(),
-            "--quiet".into(),
-        ]
-        .into_iter(),
-        true,
-        |_| {},
-    )?;
-
-    Ok(())
-}
-
-pub fn run_sb() -> eyre::Result<()> {
-    let sb_path = which("sb".into(), |a, b| {
-        if let (Some(a_meta), Some(b_meta)) = (a.metadata().ok(), b.metadata().ok()) {
-            if let (Ok(a_time), Ok(b_time)) = (a_meta.modified(), b_meta.modified()) {
-                return a_time.cmp(&b_time);
-            }
+        if dir.is_dir() {
+            println!("remove build dir: {}", dir.display().bright_white());
+            fs::remove_dir_all(&dir)?;
+            fs::create_dir_all(&dir)?;
+        } else {
+            println!(
+                "build dir {} not exists, {}",
+                "skip".yellow(),
+                dir.display().bright_white()
+            );
         }
-        a.cmp(b)
-    })
-    .wrap_err("failed to find sb in PATH")?;
-
-    let current_dir = env::current_dir().wrap_err("failed to get current dir")?;
-
-    run(
-        &sb_path,
-        &current_dir,
-        env::args().into_iter().skip(1),
-        true,
-        |_| {},
-    )?;
-
-    Ok(())
-}
-
-pub fn upgrade(_root: &Path, binary: PathBuf) -> eyre::Result<()> {
-    let building_dir = get_building_dir(get_root_dir()?);
-
-    if !is_source_updated(&building_dir, &binary) {
-        println!(
-            "staccato-build source not updated, {} upgrade",
-            "skip".green()
-        );
         Ok(())
-    } else {
-        println!("staccato-build source updated, {}...", "upgrading".blue());
-
-        copy_sb_to_old(&binary)?;
-
-        install_sb(&building_dir)?;
-
-        // run again
-
-        if let Err(err) = run_sb() {
-            println!("failed to run sb: {}", err);
-            std::process::exit(1);
-        }
-        std::process::exit(0);
     }
-}
-
-pub fn clean(opts: &BuildingOpts) -> eyre::Result<()> {
-    let dir = get_build_dir(opts);
-
-    if dir.is_dir() {
-        println!("remove build dir: {}", dir.display().bright_white());
-        fs::remove_dir_all(&dir)?;
-        fs::create_dir_all(&dir)?;
-    } else {
-        println!(
-            "build dir {} not exists, {}",
-            "skip".yellow(),
-            dir.display().bright_white()
-        );
-    }
-
-    Ok(())
 }
 
 fn real_main() -> eyre::Result<()> {
-    let mut updated = false;
-    if let Ok(root) = get_root_dir()
-        && let Ok(binary) = env::current_exe()
-    {
-        upgrade(&root, binary)?; // 先手升级
-        updated = true;
-    }
-
     let args = Cli::parse();
 
     let root = if let Some(root) = args.root {
@@ -584,33 +407,17 @@ fn real_main() -> eyre::Result<()> {
         get_root_dir()?
     };
 
-    if !updated {
-        let binary = env::current_exe();
-
-        if let Ok(binary) = binary {
-            upgrade(&root, binary)?;
-        } else {
-            println!(
-                "{} to get {}, {} upgrade check",
-                "failed".red(),
-                "current exe path".cyan(),
-                "skip".yellow()
-            );
-        }
-    }
-
     let opts = BuildingOpts {
         root: root.clone(),
-        platform: Platform {
-            os: args.target.target_os,
-            architecture: args.target.target_architecture,
-        },
         configuration: args.configuration,
     };
 
     // execute
     match args.commands {
-        Commands::BuildGlue(cmd) => {
+        Commands::Clean(cmd) => {
+            cmd.invoke(&opts)?;
+        }
+        Commands::UpdateVersion(cmd) => {
             cmd.invoke(&opts)?;
         }
         Commands::BuildRust(cmd) => {
@@ -619,22 +426,12 @@ fn real_main() -> eyre::Result<()> {
         Commands::BuildManaged(cmd) => {
             cmd.invoke(&opts)?;
         }
-        Commands::BuildAll {
-            glue,
-            rust,
-            managed,
-        } => {
-            BuildGlue::invoke(glue, &opts)?;
-            BuildRust::invoke(rust, &opts)?;
-            BuildManaged::invoke(managed, &opts)?;
-        }
-        Commands::UpdateVersion(cmd) => {
+        Commands::PreCommit(cmd) => {
             cmd.invoke(&opts)?;
         }
-    }
-
-    if args.clean {
-        clean(&opts)?;
+        Commands::PrePush(cmd) => {
+            cmd.invoke(&opts)?;
+        }
     }
 
     Ok(())
