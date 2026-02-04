@@ -15,6 +15,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
     <UseArtifactsOutput>true</UseArtifactsOutput>
-    <ArtifactsPath>$(MSBuildThisFileDirectory)/../../build/managed/$(Configuration)/$(MSBuildProjectName)</ArtifactsPath>
+    <ArtifactsPivots></ArtifactsPivots>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)/../../build/managed/</ArtifactsPath>
   </PropertyGroup>
 </Project>

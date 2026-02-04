@@ -1,4 +1,4 @@
-﻿namespace Staccato.Managed;
+namespace Staccato.Managed;
 
 public class Class1
 {

@@ -61,14 +61,11 @@ impl AsRef<Size> for Rect {
     }
 }
 
-impl Add<Point> for Rect{
+impl Add<Point> for Rect {
     type Output = Self;
 
     fn add(self, rhs: Point) -> Self::Output {
-        Self::from((
-            self.position + rhs,
-            self.size
-        ))
+        Self::from((self.position + rhs, self.size))
     }
 }
 
@@ -93,7 +90,10 @@ impl Point {
 impl std::ops::Add for Point {
     type Output = Self;
     fn add(self, other: Self) -> Self {
-        Self::new(self.x.saturating_add(other.x), self.y.saturating_add(other.y))
+        Self::new(
+            self.x.saturating_add(other.x),
+            self.y.saturating_add(other.y),
+        )
     }
 }
 

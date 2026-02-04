@@ -1,26 +1,38 @@
+mod actions;
 mod configuration;
 mod hooks;
+mod paths;
 mod platform;
+mod run;
 
 use crate::configuration::Configuration;
-use crate::platform::{Architecture, Os, is_os};
+use crate::paths::{
+    VERSION_FILE_NAME, get_build_dir, get_managed_source_dir, get_staccato_root_dir,
+    get_user_project_root,
+};
+use crate::platform::{Architecture, Os};
+use crate::run::which;
 use ::color_eyre::eyre;
 use ::owo_colors::OwoColorize;
 use clap::{Args, Parser, Subcommand};
-use color_eyre::eyre::{Context, ContextCompat, eyre};
-use std::ffi::OsStr;
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::{env, fs};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuildingOpts {
-    root: PathBuf,
+    /// are we building sample projects of staccato self now?
+    building_internal_samples: bool,
+    /// user's project root path,it maybe staccato's sample also
+    user_project_root: PathBuf,
+    /// the staccato root path
+    staccato_root: PathBuf,
+    /// build configuration
     configuration: Configuration,
 }
 
 impl AsRef<Path> for BuildingOpts {
     fn as_ref(&self) -> &Path {
-        &self.root
+        &self.staccato_root
     }
 }
 
@@ -33,6 +45,9 @@ impl AsRef<Configuration> for BuildingOpts {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Cli {
+    #[arg(short, long, global = true)]
+    pub staccato_root: Option<String>,
+
     #[arg(short, long, global = true)]
     pub root: Option<String>,
 
@@ -63,6 +78,39 @@ pub enum Commands {
     PreCommit(hooks::PreCommit),
     #[command()]
     PrePush(hooks::PrePush),
+    #[command()]
+    Test(Test),
+    #[command()]
+    Lint(Lint),
+    #[command()]
+    Format(Format),
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct Format {}
+impl Format {
+    pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
+        actions::format(opts)?;
+        Ok(())
+    }
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct Test {}
+impl Test {
+    pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
+        actions::run_tests(opts)?;
+        Ok(())
+    }
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct Lint {}
+impl Lint {
+    pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
+        actions::run_lint(opts)?;
+        Ok(())
+    }
 }
 
 #[derive(Args, Debug, Clone)]
@@ -77,10 +125,9 @@ impl BuildGlue {
 pub struct BuildRust {}
 impl BuildRust {
     pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
-        let source = opts.root.as_path();
+        let source = opts.staccato_root.as_path();
 
-        let cargo =
-            which("cargo".into(), |a, b| a.cmp(b)).wrap_err("failed to find cargo in PATH")?;
+        let cargo = which("cargo");
 
         let args = vec![
             "build".into(),
@@ -92,29 +139,36 @@ impl BuildRust {
             },
         ];
 
-        run(&cargo, &source, args.into_iter(), true, |_| {})?;
+        run::run(&cargo, source, args.into_iter(), true, |_| {})?;
 
         Ok(())
     }
 }
 
 #[derive(Args, Debug, Clone)]
-pub struct UpdateVersion {}
+pub struct UpdateVersion {
+    #[arg(long, default_value_t = false)]
+    verify_no_changes: bool,
+}
 impl UpdateVersion {
     pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
-        let version_file = opts.root.join(VERSION_FILE_NAME);
+        let version_file = opts.staccato_root.join(VERSION_FILE_NAME);
 
         let version = fs::read_to_string(&version_file)?.trim().to_string();
         println!("update version to {}", version.bright_white());
 
-        // write to source/native/rust/Cargo.toml
+        let mut no_change = true;
+
+        // write to Cargo.toml
+        println!("updating {}", "Cargo.toml".bright_white());
         {
             let start_mark = "# Version is mantained by sb,do not edit manually - start";
             let end_mark = "# Version is mantained by sb,do not edit manually - end";
 
-            let cargo_toml_file = get_rust_source_dir(opts.root.as_path()).join("Cargo.toml");
+            let cargo_toml_file = opts.staccato_root.as_path().join("Cargo.toml");
 
             let cargo_toml = fs::read_to_string(&cargo_toml_file)?;
+            let old_cargo_toml = cargo_toml.clone();
 
             let start_index = cargo_toml.find(start_mark).unwrap();
             let end_index = cargo_toml.find(end_mark).unwrap();
@@ -123,18 +177,28 @@ impl UpdateVersion {
             let new_cargo_toml = format!("{}\nversion = \"{}\"\n", new_cargo_toml, version);
             let new_cargo_toml = format!("{}{}", new_cargo_toml, &cargo_toml[end_index..]);
 
-            fs::write(&cargo_toml_file, new_cargo_toml)?;
+            if self.verify_no_changes {
+                if old_cargo_toml == new_cargo_toml {
+                    println!("the `version` of Cargo.toml is already up to date");
+                } else {
+                    no_change = false;
+                    println!("the `version` of Cargo.toml is out of date");
+                }
+            } else {
+                fs::write(&cargo_toml_file, new_cargo_toml)?;
+            }
         }
-        println!("update {}", "Cargo.toml".bright_white());
         // write to source/native/managed/Directory.Build.props
+        println!("updating {}", "Directory.Build.props".bright_white());
         {
             let start_mark = "<!-- Version is mantained by sb,do not edit manually - start -->";
             let end_mark = "<!-- Version is mantained by sb,do not edit manually - end -->";
 
             let props_file =
-                get_managed_source_dir(opts.root.as_path()).join("Directory.Build.props");
+                get_managed_source_dir(opts.staccato_root.as_path()).join("Directory.Build.props");
 
             let props = fs::read_to_string(&props_file)?;
+            let old_props = props.clone();
 
             let start_index = props.find(start_mark).unwrap();
             let end_index = props.find(end_mark).unwrap();
@@ -143,9 +207,21 @@ impl UpdateVersion {
             let new_props = format!("{}\n    <Version>{}</Version>\n    ", new_props, version);
             let new_props = format!("{}{}", new_props, &props[end_index..]);
 
-            fs::write(&props_file, new_props)?;
+            if self.verify_no_changes {
+                if old_props == new_props {
+                    println!("the `version` of Directory.Build.props is already up to date");
+                } else {
+                    no_change = false;
+                    println!("the `version` of Directory.Build.props is out of date");
+                }
+            } else {
+                fs::write(&props_file, new_props)?;
+            }
         }
-        println!("update {}", "Directory.Build.props".bright_white());
+
+        if self.verify_no_changes && (!no_change) {
+            eyre::bail!("version is out of date");
+        }
 
         Ok(())
     }
@@ -158,12 +234,11 @@ pub struct BuildManaged {
 }
 impl BuildManaged {
     pub fn invoke(self, opts: &BuildingOpts) -> eyre::Result<()> {
-        let source = get_managed_source_dir(opts.root.as_path());
+        let source = get_managed_source_dir(opts.staccato_root.as_path());
 
-        let dotnet =
-            which("dotnet".into(), |a, b| a.cmp(b)).wrap_err("failed to find dotnet in PATH")?;
+        let dotnet = which("dotnet");
 
-        run(
+        run::run(
             &dotnet,
             &source,
             vec![
@@ -181,200 +256,6 @@ impl BuildManaged {
 
         Ok(())
     }
-}
-
-pub fn which<F>(exe: String, sort_func: F) -> Option<std::path::PathBuf>
-where
-    F: FnMut(&std::path::PathBuf, &std::path::PathBuf) -> std::cmp::Ordering,
-{
-    let path = std::env::var_os("PATH")?;
-    let path_ext = if is_os(Os::Windows) {
-        let path_ext = std::env::var("PATHEXT").ok()?;
-
-        let path_ext: Vec<String> = path_ext.split(";").map(|s| s.into()).collect();
-
-        vec!["".into()]
-            .into_iter()
-            .chain(path_ext.clone().into_iter().map(|s| s.to_ascii_uppercase()))
-            .chain(path_ext.into_iter().map(|s| s.to_ascii_uppercase()))
-            .collect()
-    } else {
-        vec!["".into()]
-    };
-
-    let mut found = vec![];
-
-    for path in std::env::split_paths(&path) {
-        for ext in &path_ext {
-            let candidate = path.join(format!("{}{}", exe, ext));
-
-            if candidate.is_file() {
-                found.push(candidate);
-            }
-        }
-    }
-
-    found.sort_by(sort_func);
-
-    found.reverse();
-
-    found.into_iter().next()
-}
-
-pub fn run<F>(
-    exe: &Path,
-    work_dir: &Path,
-    args: impl Iterator<Item = String>,
-    check: bool,
-    f: F,
-) -> eyre::Result<()>
-where
-    F: FnOnce(&mut std::process::Command),
-{
-    let mut cmd = std::process::Command::new(&exe);
-
-    cmd.current_dir(work_dir);
-
-    let collected: Vec<String> = args.collect();
-
-    cmd.args(collected.iter());
-
-    f(&mut cmd);
-
-    println!(
-        "{}",
-        format!(
-            "spawn in {:?}: {:?} {}",
-            work_dir.bright_white(),
-            exe.bright_cyan(),
-            collected.join(" ").bright_blue()
-        )
-        .underline()
-    );
-
-    let mut process = cmd.spawn()?;
-
-    let exit = process.wait()?;
-
-    let code = exit
-        .code()
-        .ok_or(eyre!("failed to get exit code of the process"))?;
-
-    let success = code == 0;
-
-    println!(
-        "process exit, code {}",
-        if success {
-            code.green().to_string()
-        } else {
-            code.red().to_string()
-        }
-    );
-
-    if (!success) && check {
-        return Err(eyre::eyre!(
-            "the process failed with code {}, and argument `check` is true",
-            code
-        ));
-    }
-
-    Ok(())
-}
-
-pub fn run_fast(
-    exe: &str,
-    work_dir: impl AsRef<Path>,
-    args: impl Iterator<Item = String>,
-    check: bool,
-) -> eyre::Result<()> {
-    let exe = which(exe.to_string(), |a, b| a.cmp(b)).unwrap_or(PathBuf::from(exe));
-
-    run(exe.as_path(), work_dir.as_ref(), args, check, |_| {})?;
-
-    Ok(())
-}
-
-static VERSION_FILE_NAME: &str = "staccato.version";
-
-pub fn get_root_dir() -> eyre::Result<PathBuf> {
-    let mut current_dir = env::current_dir().wrap_err("failed to get current dir")?;
-
-    let version_file = current_dir.join(VERSION_FILE_NAME);
-
-    if version_file.is_file() {
-        return Ok(current_dir);
-    }
-
-    while let Some(parent) = current_dir.parent() {
-        let version_file = parent.join(VERSION_FILE_NAME);
-
-        if version_file.is_file() {
-            return Ok(parent.to_path_buf());
-        }
-
-        current_dir = parent.to_path_buf();
-    }
-
-    Err(eyre::eyre!(
-        "failed to find root dir, no `{}` file found in current or any parent dirs",
-        VERSION_FILE_NAME
-    ))
-}
-
-pub fn get_source_dir(root: impl AsRef<Path>) -> PathBuf {
-    let r = root.as_ref().join("source");
-    fs::create_dir_all(&r).unwrap();
-    r
-}
-
-pub fn get_building_dir(root: impl AsRef<Path>) -> PathBuf {
-    let r = root.as_ref().join("building");
-    fs::create_dir_all(&r).unwrap();
-    r
-}
-
-pub fn get_native_source_dir(root: impl AsRef<Path>) -> PathBuf {
-    let r = get_source_dir(root).join("native");
-    fs::create_dir_all(&r).unwrap();
-    r
-}
-
-pub fn get_rust_source_dir(root: impl AsRef<Path>) -> PathBuf {
-    let r = get_native_source_dir(root).join("rust");
-    fs::create_dir_all(&r).unwrap();
-    r
-}
-
-pub fn get_cpp_source_dir(root: impl AsRef<Path>) -> PathBuf {
-    let r = get_native_source_dir(root).join("glue");
-    fs::create_dir_all(&r).unwrap();
-    r
-}
-
-pub fn get_managed_source_dir(root: impl AsRef<Path>) -> PathBuf {
-    let r = get_source_dir(root).join("managed");
-    fs::create_dir_all(&r).unwrap();
-    r
-}
-
-pub fn get_opts_dir(opts: &BuildingOpts, name: &str) -> PathBuf {
-    let result = opts.root.join(name);
-
-    fs::create_dir_all(&result).unwrap();
-
-    result
-}
-
-pub fn get_build_dir(opts: &BuildingOpts) -> PathBuf {
-    get_opts_dir(opts, "build")
-}
-
-pub fn get_install_dir(opts: &BuildingOpts) -> PathBuf {
-    get_opts_dir(opts, "install")
-}
-
-pub fn get_output_dir(opts: &BuildingOpts) -> PathBuf {
-    get_opts_dir(opts, "dist")
 }
 
 #[derive(Args, Debug, Clone)]
@@ -401,15 +282,25 @@ impl Clean {
 fn real_main() -> eyre::Result<()> {
     let args = Cli::parse();
 
-    let root = if let Some(root) = args.root {
+    let root = if let Some(root) = args.staccato_root {
         PathBuf::from(root)
     } else {
-        get_root_dir()?
+        get_staccato_root_dir()?
     };
 
+    let mut building_internal_samples = false;
+
     let opts = BuildingOpts {
-        root: root.clone(),
+        user_project_root: args
+            .root
+            .map(PathBuf::from)
+            .unwrap_or(get_user_project_root(
+                root.as_path(),
+                &mut building_internal_samples,
+            )?),
+        staccato_root: root.clone(),
         configuration: args.configuration,
+        building_internal_samples,
     };
 
     // execute
@@ -432,6 +323,15 @@ fn real_main() -> eyre::Result<()> {
         Commands::PrePush(cmd) => {
             cmd.invoke(&opts)?;
         }
+        Commands::Test(cmd) => {
+            cmd.invoke(&opts)?;
+        }
+        Commands::Format(cmd) => {
+            cmd.invoke(&opts)?;
+        }
+        Commands::Lint(cmd) => {
+            cmd.invoke(&opts)?;
+        }
     }
 
     Ok(())
@@ -441,8 +341,7 @@ fn main() {
     let now = std::time::Instant::now();
 
     _ = color_eyre::install()
-        .inspect_err(|e| eprintln!("{} to install color-eyre {:?}", "failed".red(), e))
-        .unwrap_or(());
+        .inspect_err(|e| eprintln!("{} to install color-eyre {:?}", "failed".red(), e));
 
     let result = real_main();
 

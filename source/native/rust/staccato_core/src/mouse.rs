@@ -2,13 +2,13 @@ use bitflags::bitflags;
 use num_derive::{FromPrimitive, ToPrimitive};
 
 #[repr(u32)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,ToPrimitive,FromPrimitive)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, ToPrimitive, FromPrimitive)]
 pub enum UnmarkedButton {
     Left = 1,
     Middle = 2,
     Right = 3,
     Side1 = 4,
-    Side2 = 5
+    Side2 = 5,
 }
 
 bitflags! {
@@ -23,8 +23,8 @@ bitflags! {
 }
 
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,ToPrimitive,FromPrimitive)]
-pub enum MouseWheelDirection{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, ToPrimitive, FromPrimitive)]
+pub enum MouseWheelDirection {
     Normal,
-    Flipped
+    Flipped,
 }

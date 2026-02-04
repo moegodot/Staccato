@@ -15,5 +15,7 @@ staccato-application.workspace = true
 
 tracing.workspace = true
 
+eyre.workspace = true
+
 [lints]
 workspace = true

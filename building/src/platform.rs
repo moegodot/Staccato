@@ -1,20 +1,20 @@
 use clap::ValueEnum;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq,ValueEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum Architecture {
     X64 = 0,
-    Arm64
+    Arm64,
 }
 
-impl Default for Architecture{
+impl Default for Architecture {
     fn default() -> Self {
         get_architecture().expect("failed to get current architecture")
     }
 }
 
-impl AsRef<str> for Architecture{
+impl AsRef<str> for Architecture {
     fn as_ref(&self) -> &str {
-        match self{
+        match self {
             Architecture::X64 => "x64",
             Architecture::Arm64 => "arm64",
         }
@@ -22,26 +22,26 @@ impl AsRef<str> for Architecture{
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum Os{
+pub enum Os {
     Windows = 0,
     Linux,
-    MacOS
+    MacOS,
 }
 
-impl Default for Os{
+impl Default for Os {
     fn default() -> Self {
         get_os().expect("failed to get current os")
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Platform{
+pub struct _Platform {
     pub os: Option<Os>,
-    pub architecture: Option<Architecture>
+    pub architecture: Option<Architecture>,
 }
 
-impl Platform{
-    pub fn rust_target_triple(&self) -> Option<&'static str> {
+impl _Platform {
+    pub fn _rust_target_triple(&self) -> Option<&'static str> {
         if self.os.is_none() && self.architecture.is_none() {
             return None;
         }
@@ -60,9 +60,9 @@ impl Platform{
     }
 }
 
-impl AsRef<str> for Os{
+impl AsRef<str> for Os {
     fn as_ref(&self) -> &str {
-        match self{
+        match self {
             Os::Windows => "windows",
             Os::Linux => "linux",
             Os::MacOS => "macos",
@@ -70,10 +70,10 @@ impl AsRef<str> for Os{
     }
 }
 
-pub fn is_os(os:Os) -> bool{
+pub fn is_os(os: Os) -> bool {
     let current = ::std::env::consts::OS;
 
-    match os{
+    match os {
         Os::Windows => current == "windows",
         Os::Linux => current == "linux",
         Os::MacOS => current == "macos",
@@ -81,32 +81,32 @@ pub fn is_os(os:Os) -> bool{
 }
 
 #[allow(dead_code)]
-pub fn is_architecture(arch:Architecture) -> bool{
+pub fn is_architecture(arch: Architecture) -> bool {
     let current = ::std::env::consts::ARCH;
 
-    match arch{
+    match arch {
         Architecture::X64 => current == "x86_64",
         Architecture::Arm64 => current == "aarch64",
     }
 }
 
-pub fn get_os() -> Option<Os>{
+pub fn get_os() -> Option<Os> {
     let current = ::std::env::consts::OS;
 
-    Some(match current{
+    Some(match current {
         "windows" => Os::Windows,
         "linux" => Os::Linux,
         "macos" => Os::MacOS,
-        _ => return None
+        _ => return None,
     })
 }
 
-pub fn get_architecture() -> Option<Architecture>{
+pub fn get_architecture() -> Option<Architecture> {
     let current = ::std::env::consts::ARCH;
 
-    Some(match current{
+    Some(match current {
         "x86_64" => Architecture::X64,
         "aarch64" => Architecture::Arm64,
-        _ => return None
+        _ => return None,
     })
 }

@@ -65,10 +65,7 @@ impl Add<FPoint> for FRect {
     type Output = Self;
 
     fn add(self, rhs: FPoint) -> Self::Output {
-        Self::from((
-            self.position + rhs,
-            self.size
-        ))
+        Self::from((self.position + rhs, self.size))
     }
 }
 
@@ -155,10 +152,7 @@ impl Add for FSize {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        Self::new(
-            self.width + rhs.width,
-            self.height + rhs.height,
-        )
+        Self::new(self.width + rhs.width, self.height + rhs.height)
     }
 }
 
@@ -166,9 +160,6 @@ impl Sub for FSize {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        Self::new(
-            self.width - rhs.width,
-            self.height - rhs.height,
-        )
+        Self::new(self.width - rhs.width, self.height - rhs.height)
     }
 }

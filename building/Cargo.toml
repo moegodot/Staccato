@@ -1,5 +1,5 @@
 [package]
-name = "staccato_building"
+name = "staccato-building"
 version = "0.1.0"
 edition = "2024"
 
@@ -16,3 +16,4 @@ clap.workspace = true
 owo-colors.workspace = true
 exit-code.workspace = true
 humantime.workspace = true
+xshell.workspace = true

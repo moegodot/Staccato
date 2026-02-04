@@ -1,13 +1,15 @@
-use std::sync::Arc;
-use pollster::FutureExt;
-use thiserror::Error;
-use wgpu::{CreateSurfaceError, DeviceDescriptor, InstanceDescriptor, RequestAdapterError, RequestAdapterOptions, RequestDeviceError, Surface, SurfaceTarget};
-use staccato_platform_api::window::WindowBackend;
 use crate::wgpu_window::{WgpuWindow, WgpuWindowError};
 use crate::window::Window;
+use pollster::FutureExt;
+use std::sync::Arc;
+use thiserror::Error;
+use wgpu::{
+    CreateSurfaceError, DeviceDescriptor, InstanceDescriptor, RequestAdapterError,
+    RequestAdapterOptions, RequestDeviceError, SurfaceTarget,
+};
 
-#[derive(Debug,Error)]
-pub enum ContextError{
+#[derive(Debug, Error)]
+pub enum ContextError {
     #[error("failed to request adfapter:{0}")]
     RequestAdapterError(#[from] RequestAdapterError),
     #[error("failed to request device:{0}")]
@@ -15,10 +17,10 @@ pub enum ContextError{
     #[error("failed to create surface:{0}")]
     CreateSurfaceError(#[from] CreateSurfaceError),
     #[error("failed to create wgpu window:{0}")]
-    WgpuWindowError(#[from] WgpuWindowError)
+    WgpuWindowError(#[from] WgpuWindowError),
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct WgpuRenderContext {
     instance: wgpu::Instance,
     adapter: wgpu::Adapter,
@@ -27,13 +29,15 @@ pub struct WgpuRenderContext {
 }
 
 impl WgpuRenderContext {
-    pub fn new(instance_descriptor:&InstanceDescriptor,
-                                adapter_options: &RequestAdapterOptions<'_,'_>,
-                               device_descriptor: &DeviceDescriptor<'_>) -> Result<Self,ContextError> {
-        let instance = wgpu::Instance::new(&instance_descriptor);
-        let adapter = instance.request_adapter(&adapter_options).block_on()?;
+    pub fn new(
+        instance_descriptor: &InstanceDescriptor,
+        adapter_options: &RequestAdapterOptions<'_, '_>,
+        device_descriptor: &DeviceDescriptor<'_>,
+    ) -> Result<Self, ContextError> {
+        let instance = wgpu::Instance::new(instance_descriptor);
+        let adapter = instance.request_adapter(adapter_options).block_on()?;
 
-        let (device, queue) = adapter.request_device(&device_descriptor).block_on()?;
+        let (device, queue) = adapter.request_device(device_descriptor).block_on()?;
 
         Ok(Self {
             instance,
@@ -44,12 +48,12 @@ impl WgpuRenderContext {
     }
 
     pub fn new_with_window<'window>(
-        window:Window,
-        instance_descriptor:&InstanceDescriptor,
-                        adapter_options:&RequestAdapterOptions<'_,'_>,
-                         device_descriptor: &DeviceDescriptor<'_>) -> Result<(Self,WgpuWindow<'window>),ContextError> {
-
-        let instance = wgpu::Instance::new(&instance_descriptor);
+        window: Window,
+        instance_descriptor: &InstanceDescriptor,
+        adapter_options: &RequestAdapterOptions<'_, '_>,
+        device_descriptor: &DeviceDescriptor<'_>,
+    ) -> Result<(Self, WgpuWindow<'window>), ContextError> {
+        let instance = wgpu::Instance::new(instance_descriptor);
 
         let surface = instance.create_surface(SurfaceTarget::Window(window.window().handler()))?;
 
@@ -57,13 +61,11 @@ impl WgpuRenderContext {
 
         let surface_ref = &surface;
 
-        adapter_options.compatible_surface = Some(&surface_ref);
+        adapter_options.compatible_surface = Some(surface_ref);
 
         let adapter = instance.request_adapter(&adapter_options).block_on()?;
 
-        drop(adapter_options);
-
-        let (device, queue) = adapter.request_device(&device_descriptor).block_on()?;
+        let (device, queue) = adapter.request_device(device_descriptor).block_on()?;
 
         let context = Self {
             instance,
@@ -74,22 +76,22 @@ impl WgpuRenderContext {
 
         let window = WgpuWindow::from_window_and_surface(context.clone(), window, surface)?;
 
-        Ok((context,window))
+        Ok((context, window))
     }
 
-    pub fn instance(&self) -> &wgpu::Instance{
+    pub fn instance(&self) -> &wgpu::Instance {
         &self.instance
     }
 
-    pub fn adapter(&self) -> &wgpu::Adapter{
+    pub fn adapter(&self) -> &wgpu::Adapter {
         &self.adapter
     }
 
-    pub fn device(&self) -> &Arc<wgpu::Device>{
+    pub fn device(&self) -> &Arc<wgpu::Device> {
         &self.device
     }
 
-    pub fn queue(&self) -> &Arc<wgpu::Queue>{
+    pub fn queue(&self) -> &Arc<wgpu::Queue> {
         &self.queue
     }
 }

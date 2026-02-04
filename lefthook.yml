@@ -41,13 +41,12 @@
 #     - script: "hello.go"
 #       runner: go run
 pre-commit:
-    parallel: true
-    jobs:
-        - name: Run xtask
-          run: cargo xtask pre-commit
+  parallel: true
+  jobs:
+    - name: Run xtask
+      run: cargo xtask pre-commit
 pre-push:
-    parallel: true
-    jobs:
-        - name: Run xtask
-          run: cargo xtask pre-push
-
+  parallel: true
+  jobs:
+    - name: Run xtask
+      run: cargo xtask pre-push

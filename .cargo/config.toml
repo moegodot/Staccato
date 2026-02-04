@@ -1,5 +1,5 @@
 [alias]
-xtask = "run --package staccato_building --"
+xtask = "run --package staccato-building --"
 
 [build]
 target-dir = "build/native/"

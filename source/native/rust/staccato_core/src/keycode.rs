@@ -10,7 +10,7 @@ pub const fn scancode_to_keycode(scancode: u32) -> u32 {
 }
 
 #[repr(u32)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash,FromPrimitive, ToPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FromPrimitive, ToPrimitive)]
 pub enum KeyCode {
     /// 0
     Unknown = 0x00000000,

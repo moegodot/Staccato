@@ -1,5 +1,5 @@
 use std::path::Path;
-use tracing_subscriber::{fmt, prelude::*, Registry};
+use tracing_subscriber::{Registry, fmt, prelude::*};
 
 /// 注意：返回的 WorkerGuard 必须在 main 函数中保留，否则日志会在后台线程停止前被丢弃
 pub struct TelemetryGuard {
@@ -39,9 +39,11 @@ pub fn initialize(log_directory: Option<&Path>) -> eyre::Result<TelemetryGuard> 
     // 4. 将所有层注册到 Registry 并初始化
     // Registry::default() 是所有层的容器
     Registry::default()
-        .with(console_layer)   // 添加控制台层
-        .with(file_layer)      // 添加文件层 (Option 实现了 Layer 特性)
-        .try_init()?;               // 正式设为全局默认 Subscriber
+        .with(console_layer) // 添加控制台层
+        .with(file_layer) // 添加文件层 (Option 实现了 Layer 特性)
+        .try_init()?; // 正式设为全局默认 Subscriber
 
-    Ok(TelemetryGuard { _file_guard: file_guard })
+    Ok(TelemetryGuard {
+        _file_guard: file_guard,
+    })
 }

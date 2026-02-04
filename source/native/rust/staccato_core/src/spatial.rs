@@ -6,5 +6,5 @@ pub trait HasSize {
 }
 
 pub trait Resizable: HasSize + Fallible {
-    fn try_set_size(&mut self,size: Self::SizeType) -> Result<(),Self::Error>;
+    fn try_set_size(&mut self, size: Self::SizeType) -> Result<(), Self::Error>;
 }

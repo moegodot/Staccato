@@ -1,11 +1,11 @@
-pub mod rect;
+pub mod fallible;
 pub mod frect;
 pub mod id;
-pub mod spatial;
 pub mod keycode;
-pub mod scancode;
 pub mod keymod;
 pub mod mouse;
-pub mod fallible;
+pub mod rect;
+pub mod scancode;
+pub mod spatial;
 pub mod tickable;
 pub mod time_service;

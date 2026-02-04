@@ -1,12 +1,11 @@
 use num_derive::{FromPrimitive, ToPrimitive};
 
 #[repr(u32)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash,FromPrimitive, ToPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, FromPrimitive, ToPrimitive)]
 pub enum Scancode {
     Unknown = 0,
 
     // --- Usage page 0x07 (USB keyboard page) ---
-
     A = 4,
     B = 5,
     C = 6,
@@ -274,7 +273,6 @@ pub enum Scancode {
     Mode = 257,
 
     // --- Usage page 0x0C (USB consumer page) ---
-
     /// Sleep
     Sleep = 258,
     /// Wake
@@ -339,7 +337,6 @@ pub enum Scancode {
     AcBookmarks = 286,
 
     // --- Mobile keys ---
-
     /// Usually situated below the display on phones and used as a multi-function feature key
     SoftLeft = 287,
     /// Usually situated below the display on phones and used as a multi-function feature key

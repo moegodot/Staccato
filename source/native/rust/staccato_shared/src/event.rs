@@ -1,13 +1,11 @@
-use std::fmt::Debug;
-use std::rc::Rc;
-use std::sync::Arc;
+use crate::id::{KeyboardId, MouseId, WindowId};
 use staccato_core::frect::FPoint;
 use staccato_core::keycode::KeyCode;
 use staccato_core::keymod::Keymod;
 use staccato_core::mouse::{Button, MouseWheelDirection};
 use staccato_core::rect::Point;
 use staccato_core::scancode::Scancode;
-use crate::id::{KeyboardId, MouseId, WindowId};
+use std::fmt::Debug;
 
 pub const INLINE_TEXT_MAX: usize = 64;
 
@@ -49,7 +47,7 @@ pub enum DeviceOperation {
     /// device(e.g. mouse or keyboard) was added
     Added,
     /// device(e.g. mouse or keyboard) was removed
-    Removed
+    Removed,
 }
 
 #[derive(Clone, Debug)]
@@ -57,7 +55,7 @@ pub enum UserOperation {
     /// Key up
     Up,
     /// Key down
-    Down
+    Down,
 }
 
 #[derive(Clone, Debug)]
@@ -103,9 +101,16 @@ pub enum WindowEvent {
 #[derive(Clone, Debug)]
 pub enum RawEvent {
     Quit,
-    App { event: AppEvent },
-    Window { window_id: WindowId, event: WindowEvent },
-    WindowClose { id: WindowId },
+    App {
+        event: AppEvent,
+    },
+    Window {
+        window_id: WindowId,
+        event: WindowEvent,
+    },
+    WindowClose {
+        id: WindowId,
+    },
     KeymapChanged,
     Keyboard {
         window_id: WindowId,
@@ -173,7 +178,7 @@ pub trait CustomEvent : std::any::Any + Debug{
 */
 
 #[derive(Clone, Debug)]
-pub struct Event{
+pub struct Event {
     pub ns_timestamp: u64,
     pub raw: RawEvent,
 }

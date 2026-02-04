@@ -6,8 +6,7 @@
 # Ignore all automatically generated build, install and final output directories
 # 忽略所有自动生成的构建、安装和最终产出目录
 /build/
-/install/
-/artifact/
+/dist/
 # --- Staccato Custom Build Folders End ---
 
 # ------------------------------------------------------------

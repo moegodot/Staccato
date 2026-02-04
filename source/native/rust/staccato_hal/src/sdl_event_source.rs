@@ -1,10 +1,9 @@
-use crate::sdl_event;
 use crate::sdl_event::translate_event;
 use sdl3_sys::events::SDL_EVENT_POLL_SENTINEL;
 use sdl3_sys::everything::SDL_PollEvent;
 use staccato_shared::event::Event;
-use staccato_shared::event_dispatcher::{EventDispatcher, EventSource};
-use tracing::{error, trace};
+use staccato_shared::event_dispatcher::EventSource;
+use tracing::error;
 
 #[derive(Debug, Default)]
 pub struct SdlEventSource {

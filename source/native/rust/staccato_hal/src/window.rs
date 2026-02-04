@@ -1,23 +1,21 @@
-use ::std::ptr::NonNull;
-#[cfg(target_os = "macos")]
-use std::ffi::c_void;
-use ::staccato_core::rect::Size;
 use crate::error::SdlError;
+use ::staccato_core::rect::Size;
+use ::std::ptr::NonNull;
 use raw_window_handle::{
     AppKitDisplayHandle, AppKitWindowHandle, DisplayHandle, HandleError, RawDisplayHandle,
     RawWindowHandle, Win32WindowHandle, WindowsDisplayHandle,
 };
-use sdl3_sys::{
-    video::{
-        SDL_DestroyWindow, SDL_PROP_WINDOW_WIN32_HWND_POINTER,
-        SDL_PROP_WINDOW_WIN32_INSTANCE_POINTER, SDL_ShowWindow,
-    },
+use sdl3_sys::video::{
+    SDL_DestroyWindow, SDL_PROP_WINDOW_WIN32_HWND_POINTER, SDL_PROP_WINDOW_WIN32_INSTANCE_POINTER,
+    SDL_ShowWindow,
 };
 use smol_str::{SmolStr, ToSmolStr};
 use staccato_core::fallible::Fallible;
 use staccato_core::id::HasId;
 use staccato_core::spatial::{HasSize, Resizable};
 use staccato_platform_api::window::{WindowBackend, WindowId};
+#[cfg(target_os = "macos")]
+use std::ffi::c_void;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct WindowHandler {
@@ -25,7 +23,7 @@ pub struct WindowHandler {
     window_handle: RawWindowHandle,
     display_handle: RawDisplayHandle,
     id: WindowId,
-    is_open:bool,
+    is_open: bool,
     #[cfg(target_os = "macos")]
     ns_view: NonNull<c_void>,
     #[cfg(target_os = "windows")]
@@ -34,28 +32,28 @@ pub struct WindowHandler {
     hinstance: NonZeroIsize,
 }
 
-#[derive(Debug,Clone)]
-pub struct WindowOption{
+#[derive(Debug, Clone)]
+pub struct WindowOption {
     pub title: String,
-    pub size:Size
+    pub size: Size,
 }
 
 #[derive(Debug)]
 pub struct Window {
     window: WindowHandler,
     title: SmolStr,
-    size:Size,
+    size: Size,
 }
 
 impl HasId for Window {
-    type Id=WindowId;
+    type Id = WindowId;
     fn id(&self) -> Self::Id {
         self.window.id
     }
 }
 
 impl HasSize for Window {
-    type SizeType=Size;
+    type SizeType = Size;
 
     fn get_size(&self) -> Self::SizeType {
         self.size
@@ -64,40 +62,38 @@ impl HasSize for Window {
 
 impl Resizable for Window {
     fn try_set_size(&mut self, size: Self::SizeType) -> Result<(), Self::Error> {
-        Ok(self.window.set_size(size)?)
+        self.window.set_size(size)
     }
 }
 
-impl Fallible for Window{
+impl Fallible for Window {
     type Error = SdlError;
 }
 
-impl Window{
-    pub fn update(&mut self) -> Result<(),SdlError>{
+impl Window {
+    pub fn update(&mut self) -> Result<(), SdlError> {
         self.title = self.window.title()?;
         self.size = self.window.size()?;
         Ok(())
     }
 
-    pub fn window(&self) -> &WindowHandler{
+    pub fn window(&self) -> &WindowHandler {
         &self.window
     }
 
-    pub fn window_mut(&mut self) -> &mut WindowHandler{
+    pub fn window_mut(&mut self) -> &mut WindowHandler {
         &mut self.window
     }
 
-    pub fn new(option:WindowOption) -> Result<Self, SdlError> {
+    pub fn new(option: WindowOption) -> Result<Self, SdlError> {
         let window = WindowHandler::new(option)?;
         let title = window.title()?;
         let size = window.size()?;
-        Ok(
-            Self{
-                window,
-                title,
-                size
-            }
-        )
+        Ok(Self {
+            window,
+            title,
+            size,
+        })
     }
 }
 
@@ -107,7 +103,7 @@ impl WindowBackend for Window {
     }
 
     fn set_title(&mut self, title: &str) -> Result<(), Self::Error> {
-        Ok(self.window.set_title(title)?)
+        self.window.set_title(title)
     }
 
     fn handler(&self) -> Box<dyn staccato_platform_api::window::WindowHandle + 'static> {
@@ -115,11 +111,11 @@ impl WindowBackend for Window {
     }
 
     fn hide(&mut self) -> Result<(), Self::Error> {
-        Ok(self.window.hide()?)
+        self.window.hide()
     }
 
     fn show(&mut self) -> Result<(), Self::Error> {
-        Ok(self.window.show()?)
+        self.window.show()
     }
 
     fn is_open(&self) -> bool {
@@ -128,7 +124,7 @@ impl WindowBackend for Window {
 }
 
 impl WindowHandler {
-    pub fn new(option:WindowOption) -> Result<Self, SdlError> {
+    pub fn new(option: WindowOption) -> Result<Self, SdlError> {
         let title = option.title;
         let width = option.size.width;
         let height = option.size.height;
@@ -139,11 +135,13 @@ impl WindowHandler {
             let flags = if cfg!(target_os = "macos") {
                 // we use metal on macos
                 // for SDL and wgpu
-                sdl3_sys::video::SDL_WindowFlags::RESIZABLE | sdl3_sys::video::SDL_WindowFlags::METAL
+                sdl3_sys::video::SDL_WindowFlags::RESIZABLE
+                    | sdl3_sys::video::SDL_WindowFlags::METAL
             } else if cfg!(target_os = "windows") {
                 // windows or linux(todo) use vulkan
                 // the `dx12` backend is disabled for wgpu
-                sdl3_sys::video::SDL_WindowFlags::RESIZABLE | sdl3_sys::video::SDL_WindowFlags::VULKAN
+                sdl3_sys::video::SDL_WindowFlags::RESIZABLE
+                    | sdl3_sys::video::SDL_WindowFlags::VULKAN
             } else {
                 todo!("linux or other platform support")
             };
@@ -163,11 +161,11 @@ impl WindowHandler {
                 None => return Err(SdlError::sdl_err("failed to create window")),
             };
 
-            let mut window_err = window.clone();
+            let mut window_err = window;
             let mut error = |msg: &'static str| -> SdlError {
                 let err = SdlError::sdl_err(msg);
                 SDL_DestroyWindow(window_err.as_mut());
-                return err;
+                err
             };
 
             if !SDL_ShowWindow(window.as_mut()) {
@@ -187,12 +185,27 @@ impl WindowHandler {
 
                 let display_handle = RawDisplayHandle::AppKit(AppKitDisplayHandle::new());
 
-                Ok(Self { window, window_handle, display_handle, ns_view,id,is_open })
+                Ok(Self {
+                    window,
+                    window_handle,
+                    display_handle,
+                    ns_view,
+                    id,
+                    is_open,
+                })
             } else if cfg!(target_os = "windows") {
                 let id = sdl3_sys::video::SDL_GetWindowProperties(window.as_ptr());
 
-                let hwnd = sdl3_sys::properties::SDL_GetPointerProperty(id, SDL_PROP_WINDOW_WIN32_HWND_POINTER, core::ptr::null_mut());
-                let hinstance = sdl3_sys::properties::SDL_GetPointerProperty(id, SDL_PROP_WINDOW_WIN32_INSTANCE_POINTER, core::ptr::null_mut());
+                let hwnd = sdl3_sys::properties::SDL_GetPointerProperty(
+                    id,
+                    SDL_PROP_WINDOW_WIN32_HWND_POINTER,
+                    core::ptr::null_mut(),
+                );
+                let hinstance = sdl3_sys::properties::SDL_GetPointerProperty(
+                    id,
+                    SDL_PROP_WINDOW_WIN32_INSTANCE_POINTER,
+                    core::ptr::null_mut(),
+                );
 
                 let hwnd = match std::num::NonZeroIsize::new(hwnd as isize) {
                     Some(hwnd) => hwnd,
@@ -215,7 +228,15 @@ impl WindowHandler {
                 let _display_handle = RawDisplayHandle::Windows(WindowsDisplayHandle::new());
 
                 #[cfg(target_os = "windows")]
-                return Ok(Self { window, window_handle: _window_handle, display_handle: _display_handle, hwnd, hinstance,id,is_open });
+                return Ok(Self {
+                    window,
+                    window_handle: _window_handle,
+                    display_handle: _display_handle,
+                    hwnd,
+                    hinstance,
+                    id,
+                    is_open,
+                });
                 #[cfg(not(target_os = "windows"))]
                 unreachable!();
             } else {
@@ -225,9 +246,9 @@ impl WindowHandler {
     }
 
     pub fn handler(&self) -> Box<RawWindowHandler> {
-        Box::from( RawWindowHandler {
+        Box::from(RawWindowHandler {
             window: self.window_handle,
-            display: self.display_handle
+            display: self.display_handle,
         })
     }
 
@@ -236,7 +257,7 @@ impl WindowHandler {
     }
 
     pub fn id(&self) -> u64 {
-        return self.id
+        self.id
     }
 
     pub fn size(&self) -> Result<Size, SdlError> {
@@ -261,14 +282,13 @@ impl WindowHandler {
         Ok(())
     }
 
-    pub fn title(&self) -> Result<SmolStr,SdlError> {
+    pub fn title(&self) -> Result<SmolStr, SdlError> {
         self.checked_open()?;
         unsafe {
             let title_ptr = sdl3_sys::video::SDL_GetWindowTitle(self.as_ptr());
             if title_ptr.is_null() {
                 Ok("".to_smolstr())
-            }
-            else {
+            } else {
                 Ok(std::ffi::CStr::from_ptr(title_ptr)
                     .to_string_lossy()
                     .to_smolstr())
@@ -308,16 +328,15 @@ impl WindowHandler {
         Ok(())
     }
 
-    fn checked_open(&self) -> Result<(),SdlError>{
-        if !self.is_open{
+    fn checked_open(&self) -> Result<(), SdlError> {
+        if !self.is_open {
             Err(SdlError::sdl_err("try to operate a closed window"))
-        }
-        else {
+        } else {
             Ok(())
         }
     }
 
-    pub fn close(&mut self){
+    pub fn close(&mut self) {
         self.is_open = false;
     }
 

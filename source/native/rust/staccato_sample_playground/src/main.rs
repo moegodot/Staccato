@@ -12,22 +12,20 @@ use staccato_application::staccato_shared::event_dispatcher::{
     EventDispatcher, EventHandler, EventSource, StdEventDispatcher,
 };
 use staccato_application::staccato_shared::ticker::{StdTicker, Ticker};
-use staccato_telemetry::initialize;
 use std::convert::Infallible;
-use tracing::{error, trace};
 
 #[derive(Debug)]
 pub struct Main<'a> {
-    window: WgpuWindow<'a>,
-    context: WgpuRenderContext,
+    _window: WgpuWindow<'a>,
+    _context: WgpuRenderContext,
     running: bool,
 }
 
 impl<'w> From<(WgpuRenderContext, WgpuWindow<'w>)> for Main<'w> {
     fn from(value: (WgpuRenderContext, WgpuWindow<'w>)) -> Self {
         Self {
-            window: value.1,
-            context: value.0,
+            _window: value.1,
+            _context: value.0,
             running: true,
         }
     }
@@ -38,19 +36,19 @@ impl Fallible for Main<'_> {
 }
 
 impl Tickable for Main<'_> {
-    fn pre_update(&mut self, elapse_ns: u64) -> Result<(), Self::Error> {
+    fn pre_update(&mut self, _elapse_ns: u64) -> Result<(), Self::Error> {
         Ok(())
     }
 
-    fn fixed_update(&mut self, elapse_ns: u64) -> Result<(), Self::Error> {
+    fn fixed_update(&mut self, _elapse_ns: u64) -> Result<(), Self::Error> {
         Ok(())
     }
 
-    fn update(&mut self, elapse_ns: u64) -> Result<(), Self::Error> {
+    fn update(&mut self, _elapse_ns: u64) -> Result<(), Self::Error> {
         Ok(())
     }
 
-    fn post_update(&mut self, elapse_ns: u64) -> Result<(), Self::Error> {
+    fn post_update(&mut self, _elapse_ns: u64) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -66,7 +64,7 @@ impl EventHandler for Main<'_> {
         {
             self.running = false;
         }
-        if let RawEvent::WindowClose { id } = event.raw {
+        if let RawEvent::WindowClose { id: _ } = event.raw {
             self.running = false
         }
 
@@ -74,7 +72,7 @@ impl EventHandler for Main<'_> {
     }
 }
 
-fn main() {
+fn main() -> Result<(), eyre::Report> {
     let app_info = ApplicationInformation {
         name: "staccato sample - playground".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
@@ -85,7 +83,7 @@ fn main() {
         app_type: "application".to_string(),
     };
 
-    let app = app_info.initialize_app(None).unwrap();
+    let _app = app_info.initialize_app(None)?;
 
     let mut event_source = SdlEventSource::default();
 
@@ -101,25 +99,25 @@ fn main() {
             width: 1024,
             height: 768,
         },
-    })
-    .unwrap();
+    })?;
 
     let mut main: Main<'_> = WgpuRenderContext::new_with_window(
         window,
         &Default::default(),
         &Default::default(),
         &Default::default(),
-    )
-    .unwrap()
+    )?
     .into();
 
     while main.running {
         let events = event_source.poll();
 
         for event in events {
-            event_dispatcher.fire(&mut [&mut main], event).unwrap();
+            event_dispatcher.fire(&mut [&mut main], event)?;
         }
 
-        ticker.drive(&time_service, &mut main).unwrap();
+        ticker.drive(&time_service, &mut main)?;
     }
+
+    Ok(())
 }
